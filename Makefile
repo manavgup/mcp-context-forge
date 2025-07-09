@@ -20,7 +20,7 @@ TEST_DOCS_DIR ?= $(DOCS_DIR)/docs/test
 # Project-wide clean-up targets
 DIRS_TO_CLEAN := __pycache__ .pytest_cache .tox .ruff_cache .pyre .mypy_cache .pytype \
                  dist build site .eggs *.egg-info .cache htmlcov certs \
-                 $(VENV_DIR).sbom $(COVERAGE_DIR) \
+                 $(VENV_DIR) $(VENV_DIR).sbom $(COVERAGE_DIR) \
                  node_modules
 
 FILES_TO_CLEAN := .coverage coverage.xml mcp.prof mcp.pstats \
