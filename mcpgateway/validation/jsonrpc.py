@@ -74,42 +74,42 @@ def validate_request(request: Dict[str, Any]) -> None:
 
     Raises:
         JSONRPCError: If request is invalid
-        
+
     Examples:
         Valid request:
         >>> validate_request({"jsonrpc": "2.0", "method": "ping", "id": 1})
-        
+
         Valid notification (no id):
         >>> validate_request({"jsonrpc": "2.0", "method": "notify"})
-        
+
         Valid request with params:
         >>> validate_request({"jsonrpc": "2.0", "method": "add", "params": [1, 2], "id": 1})
         >>> validate_request({"jsonrpc": "2.0", "method": "add", "params": {"a": 1, "b": 2}, "id": 1})
-        
+
         Invalid version:
         >>> validate_request({"jsonrpc": "1.0", "method": "ping", "id": 1})  # doctest: +ELLIPSIS
         Traceback (most recent call last):
             ...
         mcpgateway.validation.jsonrpc.JSONRPCError: Invalid JSON-RPC version
-        
+
         Missing method:
         >>> validate_request({"jsonrpc": "2.0", "id": 1})  # doctest: +ELLIPSIS
         Traceback (most recent call last):
             ...
         mcpgateway.validation.jsonrpc.JSONRPCError: Invalid or missing method
-        
+
         Empty method:
         >>> validate_request({"jsonrpc": "2.0", "method": "", "id": 1})  # doctest: +ELLIPSIS
         Traceback (most recent call last):
             ...
         mcpgateway.validation.jsonrpc.JSONRPCError: Invalid or missing method
-        
+
         Invalid params type:
         >>> validate_request({"jsonrpc": "2.0", "method": "test", "params": "invalid", "id": 1})  # doctest: +ELLIPSIS
         Traceback (most recent call last):
             ...
         mcpgateway.validation.jsonrpc.JSONRPCError: Invalid params type
-        
+
         Invalid ID type:
         >>> validate_request({"jsonrpc": "2.0", "method": "test", "id": True})  # doctest: +ELLIPSIS
         Traceback (most recent call last):

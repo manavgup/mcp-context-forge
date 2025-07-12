@@ -210,7 +210,7 @@ class Settings(BaseSettings):
 
         Returns:
             str: API key string in the format "username:password".
-            
+
         Examples:
             >>> settings = Settings(basic_auth_user="admin", basic_auth_password="secret")
             >>> settings.api_key
@@ -227,7 +227,7 @@ class Settings(BaseSettings):
 
         Returns:
             bool: True if HTTP transport is enabled, False otherwise.
-            
+
         Examples:
             >>> settings = Settings(transport_type="http")
             >>> settings.supports_http
@@ -247,7 +247,7 @@ class Settings(BaseSettings):
 
         Returns:
             bool: True if WebSocket transport is enabled, False otherwise.
-            
+
         Examples:
             >>> settings = Settings(transport_type="ws")
             >>> settings.supports_websocket
@@ -267,7 +267,7 @@ class Settings(BaseSettings):
 
         Returns:
             bool: True if SSE transport is enabled, False otherwise.
-            
+
         Examples:
             >>> settings = Settings(transport_type="sse")
             >>> settings.supports_sse

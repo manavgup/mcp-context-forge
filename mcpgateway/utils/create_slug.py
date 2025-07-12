@@ -34,26 +34,26 @@ def slugify(text):
 
     Returns:
         str: Slugified text
-        
+
     Examples:
         Basic slugification:
         >>> slugify("Hello World")
         'hello-world'
         >>> slugify("Test-Case_123")
         'test-case-123'
-        
+
         Handle special characters:
         >>> slugify("Café & Restaurant")
         'cafe-restaurant'
         >>> slugify("user@example.com")
         'user-example-com'
-        
+
         Handle contractions:
         >>> slugify("Don't Stop")
         'dont-stop'
         >>> slugify("It's Working")
         'its-working'
-        
+
         Edge cases:
         >>> slugify("")
         ''
@@ -63,7 +63,7 @@ def slugify(text):
         'test'
         >>> slugify("Multiple   Spaces")
         'multiple-spaces'
-        
+
         Unicode normalization:
         >>> slugify("Naïve résumé")
         'naive-resume'
