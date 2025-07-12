@@ -3,7 +3,7 @@
 #   (An enterprise-ready Model Context Protocol Gateway)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #
-# Author: Mihai Criveti
+# Authors: Mihai Criveti, Manav Gupta
 # Description: Build & automation helpers for the MCP Gateway project
 # Usage: run `make` or `make help` to view available targets
 #
@@ -182,8 +182,12 @@ clean:
 # help: htmlcov              - (re)build just the HTML coverage report into docs
 # help: test-curl            - Smoke-test API endpoints with curl script
 # help: pytest-examples      - Run README / examples through pytest-examples
+# help: doctest              - Run doctest on all modules with summary report
+# help: doctest-verbose      - Run doctest with detailed output (-v flag)
+# help: doctest-coverage     - Generate coverage report for doctest examples
+# help: doctest-check        - Check doctest coverage percentage (fail if < 100%)
 
-.PHONY: smoketest test coverage pytest-examples test-curl htmlcov
+.PHONY: smoketest test coverage pytest-examples test-curl htmlcov doctest doctest-verbose doctest-coverage doctest-check
 
 ## --- Automated checks --------------------------------------------------------
 smoketest:
@@ -238,6 +242,43 @@ pytest-examples:
 
 test-curl:
 	./test_endpoints.sh
+
+## --- Doctest targets ---------------------------------------------------------
+doctest:
+	@echo "🧪 Running doctest on all modules..."
+	@test -d "$(VENV_DIR)" || $(MAKE) venv
+	@/bin/bash -c "source $(VENV_DIR)/bin/activate && \
+		python3 -m pytest --doctest-modules mcpgateway/ --tb=short"
+
+doctest-verbose:
+	@echo "🧪 Running doctest with verbose output..."
+	@test -d "$(VENV_DIR)" || $(MAKE) venv
+	@/bin/bash -c "source $(VENV_DIR)/bin/activate && \
+		python3 -m pytest --doctest-modules mcpgateway/ -v --tb=short"
+
+doctest-coverage:
+	@echo "📊 Generating doctest coverage report..."
+	@test -d "$(VENV_DIR)" || $(MAKE) venv
+	@mkdir -p $(TEST_DOCS_DIR)
+	@/bin/bash -c "source $(VENV_DIR)/bin/activate && \
+		python3 -m pytest --doctest-modules mcpgateway/ \
+		--cov=mcpgateway --cov-report=term --cov-report=html:htmlcov-doctest \
+		--cov-report=xml:coverage-doctest.xml"
+	@echo "✅ Doctest coverage report generated in htmlcov-doctest/"
+
+doctest-check:
+	@echo "🔍 Checking doctest coverage..."
+	@test -d "$(VENV_DIR)" || $(MAKE) venv
+	@/bin/bash -c "source $(VENV_DIR)/bin/activate && \
+		python3 -c \"import subprocess, sys; \
+		result = subprocess.run(['python', '-m', 'pytest', '--doctest-modules', 'mcpgateway/', '--tb=no', '-q'], capture_output=True); \
+		if result.returncode == 0: \
+			print('✅ All doctests passing'); \
+		else: \
+			print('❌ Doctest failures detected'); \
+			print(result.stdout.decode()); \
+			print(result.stderr.decode()); \
+			sys.exit(1)\""
 
 # =============================================================================
 # 📊 METRICS

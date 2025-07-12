@@ -82,6 +82,30 @@ jobs:
             --cov-branch \
             --cov-fail-under=40
 
+      # -----------------------------------------------------------
+      # 4️⃣  Run doctests
+      # -----------------------------------------------------------
+      - name: 🧪  Run doctests
+        run: |
+          pytest --doctest-modules mcpgateway/ --tb=short
+
+      # -----------------------------------------------------------
+      # 5️⃣  Doctest coverage check
+      # -----------------------------------------------------------
+      - name: 📊  Doctest coverage validation
+        run: |
+          python -c "
+          import subprocess, sys
+          result = subprocess.run(['python', '-m', 'pytest', '--doctest-modules', 'mcpgateway/', '--tb=no', '-q'], capture_output=True)
+          if result.returncode == 0:
+              print('✅ All doctests passing')
+          else:
+              print('❌ Doctest failures detected')
+              print(result.stdout.decode())
+              print(result.stderr.decode())
+              sys.exit(1)
+          "
+
     # -----------------------------------------------------------
     # 4️⃣  Upload coverage artifacts (XML + HTML)
     #       --- keep disabled unless you need them ---
