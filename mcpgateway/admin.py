@@ -106,6 +106,88 @@ async def admin_list_servers(
 
     Returns:
         List[ServerRead]: A list of server records.
+
+    Examples:
+        >>> import asyncio
+        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> from mcpgateway.schemas import ServerRead
+        >>> 
+        >>> # Mock dependencies
+        >>> mock_db = MagicMock()
+        >>> mock_user = "test_user"
+        >>> 
+        >>> # Mock server service
+        >>> from datetime import datetime, timezone
+        >>> from mcpgateway.schemas import ServerMetrics
+        >>> mock_metrics = ServerMetrics(
+        ...     total_executions=10,
+        ...     successful_executions=8,
+        ...     failed_executions=2,
+        ...     failure_rate=0.2,
+        ...     min_response_time=0.1,
+        ...     max_response_time=2.0,
+        ...     avg_response_time=0.5,
+        ...     last_execution_time=datetime.now(timezone.utc)
+        ... )
+        >>> mock_server = ServerRead(
+        ...     id="server-1",
+        ...     name="Test Server",
+        ...     description="A test server",
+        ...     icon="test-icon.png",
+        ...     created_at=datetime.now(timezone.utc),
+        ...     updated_at=datetime.now(timezone.utc),
+        ...     is_active=True,
+        ...     associated_tools=["tool1", "tool2"],
+        ...     associated_resources=[1, 2],
+        ...     associated_prompts=[1],
+        ...     metrics=mock_metrics
+        ... )
+        >>> 
+        >>> # Mock the server_service.list_servers method
+        >>> original_list_servers = server_service.list_servers
+        >>> server_service.list_servers = AsyncMock(return_value=[mock_server])
+        >>> 
+        >>> # Test the function
+        >>> async def test_admin_list_servers():
+        ...     result = await admin_list_servers(
+        ...         include_inactive=False,
+        ...         db=mock_db,
+        ...         user=mock_user
+        ...     )
+        ...     return len(result) > 0 and isinstance(result[0], dict)
+        >>> 
+        >>> # Run the test
+        >>> asyncio.run(test_admin_list_servers())
+        True
+        >>> 
+        >>> # Restore original method
+        >>> server_service.list_servers = original_list_servers
+        >>> 
+        >>> # Additional test for empty server list
+        >>> server_service.list_servers = AsyncMock(return_value=[])
+        >>> async def test_admin_list_servers_empty():
+        ...     result = await admin_list_servers(
+        ...         include_inactive=True,
+        ...         db=mock_db,
+        ...         user=mock_user
+        ...     )
+        ...     return result == []
+        >>> asyncio.run(test_admin_list_servers_empty())
+        True
+        >>> server_service.list_servers = original_list_servers
+        >>> 
+        >>> # Additional test for exception handling
+        >>> import pytest
+        >>> from fastapi import HTTPException
+        >>> async def test_admin_list_servers_exception():
+        ...     server_service.list_servers = AsyncMock(side_effect=Exception("Test error"))
+        ...     try:
+        ...         await admin_list_servers(False, mock_db, mock_user)
+        ...     except Exception as e:
+        ...         return str(e) == "Test error"
+        ...     return False
+        >>> asyncio.run(test_admin_list_servers_exception())
+        True
     """
     logger.debug(f"User {user} requested server list")
     servers = await server_service.list_servers(db, include_inactive=include_inactive)
@@ -127,6 +209,83 @@ async def admin_get_server(server_id: str, db: Session = Depends(get_db), user: 
 
     Raises:
         HTTPException: If the server is not found.
+
+    Examples:
+        >>> import asyncio
+        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> from mcpgateway.schemas import ServerRead
+        >>> from mcpgateway.services.server_service import ServerNotFoundError
+        >>> from fastapi import HTTPException
+        >>> 
+        >>> # Mock dependencies
+        >>> mock_db = MagicMock()
+        >>> mock_user = "test_user"
+        >>> server_id = "test-server-1"
+        >>> 
+        >>> # Mock server response
+        >>> from datetime import datetime, timezone
+        >>> from mcpgateway.schemas import ServerMetrics
+        >>> mock_metrics = ServerMetrics(
+        ...     total_executions=5,
+        ...     successful_executions=4,
+        ...     failed_executions=1,
+        ...     failure_rate=0.2,
+        ...     min_response_time=0.2,
+        ...     max_response_time=1.5,
+        ...     avg_response_time=0.8,
+        ...     last_execution_time=datetime.now(timezone.utc)
+        ... )
+        >>> mock_server = ServerRead(
+        ...     id=server_id,
+        ...     name="Test Server",
+        ...     description="A test server",
+        ...     icon="test-icon.png",
+        ...     created_at=datetime.now(timezone.utc),
+        ...     updated_at=datetime.now(timezone.utc),
+        ...     is_active=True,
+        ...     associated_tools=["tool1"],
+        ...     associated_resources=[1],
+        ...     associated_prompts=[1],
+        ...     metrics=mock_metrics
+        ... )
+        >>> 
+        >>> # Mock the server_service.get_server method
+        >>> original_get_server = server_service.get_server
+        >>> server_service.get_server = AsyncMock(return_value=mock_server)
+        >>> 
+        >>> # Test successful retrieval
+        >>> async def test_admin_get_server_success():
+        ...     result = await admin_get_server(
+        ...         server_id=server_id,
+        ...         db=mock_db,
+        ...         user=mock_user
+        ...     )
+        ...     return isinstance(result, dict) and result.get('id') == server_id
+        >>> 
+        >>> # Run the test
+        >>> asyncio.run(test_admin_get_server_success())
+        True
+        >>> 
+        >>> # Test server not found scenario
+        >>> server_service.get_server = AsyncMock(side_effect=ServerNotFoundError("Server not found"))
+        >>> 
+        >>> async def test_admin_get_server_not_found():
+        ...     try:
+        ...         await admin_get_server(
+        ...             server_id="nonexistent",
+        ...             db=mock_db,
+        ...             user=mock_user
+        ...         )
+        ...         return False
+        ...     except HTTPException as e:
+        ...         return e.status_code == 404
+        >>> 
+        >>> # Run the not found test
+        >>> asyncio.run(test_admin_get_server_not_found())
+        True
+        >>> 
+        >>> # Restore original method
+        >>> server_service.get_server = original_get_server
     """
     try:
         logger.debug(f"User {user} requested details for server ID {server_id}")
@@ -160,6 +319,90 @@ async def admin_add_server(request: Request, db: Session = Depends(get_db), user
 
     Returns:
         RedirectResponse: A redirect to the admin dashboard catalog section
+
+    Examples:
+        >>> import asyncio
+        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> from fastapi import Request
+        >>> from fastapi.responses import RedirectResponse
+        >>> from starlette.datastructures import FormData
+        >>> 
+        >>> # Mock dependencies
+        >>> mock_db = MagicMock()
+        >>> mock_user = "test_user"
+        >>> 
+        >>> # Mock form data for successful server creation
+        >>> form_data = FormData([
+        ...     ("name", "Test Server"),
+        ...     ("description", "A test server"),
+        ...     ("icon", "test-icon.png"),
+        ...     ("associatedTools", "tool1"),
+        ...     ("associatedTools", "tool2"),
+        ...     ("associatedResources", "resource1"),
+        ...     ("associatedPrompts", "prompt1"),
+        ...     ("is_inactive_checked", "false")
+        ... ])
+        >>> 
+        >>> # Mock request with form data
+        >>> mock_request = MagicMock(spec=Request)
+        >>> mock_request.form = AsyncMock(return_value=form_data)
+        >>> mock_request.scope = {"root_path": "/test"}
+        >>> 
+        >>> # Mock server service
+        >>> original_register_server = server_service.register_server
+        >>> server_service.register_server = AsyncMock()
+        >>> 
+        >>> # Test successful server addition
+        >>> async def test_admin_add_server_success():
+        ...     result = await admin_add_server(
+        ...         request=mock_request,
+        ...         db=mock_db,
+        ...         user=mock_user
+        ...     )
+        ...     return isinstance(result, RedirectResponse) and result.status_code == 303
+        >>> 
+        >>> # Run the test
+        >>> asyncio.run(test_admin_add_server_success())
+        True
+        >>> 
+        >>> # Test with inactive checkbox checked
+        >>> form_data_inactive = FormData([
+        ...     ("name", "Test Server"),
+        ...     ("description", "A test server"),
+        ...     ("is_inactive_checked", "true")
+        ... ])
+        >>> mock_request.form = AsyncMock(return_value=form_data_inactive)
+        >>> 
+        >>> async def test_admin_add_server_inactive():
+        ...     result = await admin_add_server(mock_request, mock_db, mock_user)
+        ...     return isinstance(result, RedirectResponse) and "include_inactive=true" in result.headers["location"]
+        >>> 
+        >>> asyncio.run(test_admin_add_server_inactive())
+        True
+        >>> 
+        >>> # Test exception handling - should still return redirect
+        >>> async def test_admin_add_server_exception():
+        ...     server_service.register_server = AsyncMock(side_effect=Exception("Test error"))
+        ...     result = await admin_add_server(mock_request, mock_db, mock_user)
+        ...     return isinstance(result, RedirectResponse) and result.status_code == 303
+        >>> 
+        >>> asyncio.run(test_admin_add_server_exception())
+        True
+        >>> 
+        >>> # Test with minimal form data
+        >>> form_data_minimal = FormData([("name", "Minimal Server")])
+        >>> mock_request.form = AsyncMock(return_value=form_data_minimal)
+        >>> server_service.register_server = AsyncMock()
+        >>> 
+        >>> async def test_admin_add_server_minimal():
+        ...     result = await admin_add_server(mock_request, mock_db, mock_user)
+        ...     return isinstance(result, RedirectResponse)
+        >>> 
+        >>> asyncio.run(test_admin_add_server_minimal())
+        True
+        >>> 
+        >>> # Restore original method
+        >>> server_service.register_server = original_register_server
     """
     form = await request.form()
     is_inactive_checked = form.get("is_inactive_checked", "false")
@@ -189,752 +432,10 @@ async def admin_add_server(request: Request, db: Session = Depends(get_db), user
         return RedirectResponse(f"{root_path}/admin#catalog", status_code=303)
 
 
-@admin_router.post("/servers/{server_id}/edit")
-async def admin_edit_server(
-    server_id: str,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: str = Depends(require_auth),
-) -> RedirectResponse:
-    """
-    Edit an existing server via the admin UI.
-
-    This endpoint processes form data to update an existing server's properties.
-    It handles exceptions gracefully and logs any errors that occur during the
-    update operation.
-
-    Expects form fields:
-      - name (optional): The updated name of the server
-      - description (optional): An updated description of the server's purpose
-      - icon (optional): Updated URL or path to the server's icon
-      - associatedTools (optional, comma-separated): Updated list of tools associated with this server
-      - associatedResources (optional, comma-separated): Updated list of resources associated with this server
-      - associatedPrompts (optional, comma-separated): Updated list of prompts associated with this server
-
-    Args:
-        server_id (str): The ID of the server to edit
-        request (Request): FastAPI request containing form data
-        db (Session): Database session dependency
-        user (str): Authenticated user dependency
-
-    Returns:
-        RedirectResponse: A redirect to the admin dashboard catalog section with a status code of 303
-    """
-    form = await request.form()
-    is_inactive_checked = form.get("is_inactive_checked", "false")
-    try:
-        logger.debug(f"User {user} is editing server ID {server_id} with name: {form.get('name')}")
-        server = ServerUpdate(
-            name=form.get("name"),
-            description=form.get("description"),
-            icon=form.get("icon"),
-            associated_tools=",".join(form.getlist("associatedTools")),
-            associated_resources=form.get("associatedResources"),
-            associated_prompts=form.get("associatedPrompts"),
-        )
-        await server_service.update_server(db, server_id, server)
-
-        root_path = request.scope.get("root_path", "")
-
-        if is_inactive_checked.lower() == "true":
-            return RedirectResponse(f"{root_path}/admin/?include_inactive=true#catalog", status_code=303)
-        return RedirectResponse(f"{root_path}/admin#catalog", status_code=303)
-    except Exception as e:
-        logger.error(f"Error editing server: {e}")
-
-        root_path = request.scope.get("root_path", "")
-        if is_inactive_checked.lower() == "true":
-            return RedirectResponse(f"{root_path}/admin/?include_inactive=true#catalog", status_code=303)
-        return RedirectResponse(f"{root_path}/admin#catalog", status_code=303)
-
-
-@admin_router.post("/servers/{server_id}/toggle")
-async def admin_toggle_server(
-    server_id: str,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: str = Depends(require_auth),
-) -> RedirectResponse:
-    """
-    Toggle a server's active status via the admin UI.
-
-    This endpoint processes a form request to activate or deactivate a server.
-    It expects a form field 'activate' with value "true" to activate the server
-    or "false" to deactivate it. The endpoint handles exceptions gracefully and
-    logs any errors that might occur during the status toggle operation.
-
-    Args:
-        server_id (str): The ID of the server whose status to toggle.
-        request (Request): FastAPI request containing form data with the 'activate' field.
-        db (Session): Database session dependency.
-        user (str): Authenticated user dependency.
-
-    Returns:
-        RedirectResponse: A redirect to the admin dashboard catalog section with a
-        status code of 303 (See Other).
-    """
-    form = await request.form()
-    logger.debug(f"User {user} is toggling server ID {server_id} with activate: {form.get('activate')}")
-    activate = form.get("activate", "true").lower() == "true"
-    is_inactive_checked = form.get("is_inactive_checked", "false")
-    try:
-        await server_service.toggle_server_status(db, server_id, activate)
-    except Exception as e:
-        logger.error(f"Error toggling server status: {e}")
-
-    root_path = request.scope.get("root_path", "")
-    if is_inactive_checked.lower() == "true":
-        return RedirectResponse(f"{root_path}/admin/?include_inactive=true#catalog", status_code=303)
-    return RedirectResponse(f"{root_path}/admin#catalog", status_code=303)
-
-
-@admin_router.post("/servers/{server_id}/delete")
-async def admin_delete_server(server_id: str, request: Request, db: Session = Depends(get_db), user: str = Depends(require_auth)) -> RedirectResponse:
-    """
-    Delete a server via the admin UI.
-
-    This endpoint removes a server from the database by its ID. It handles exceptions
-    gracefully and logs any errors that occur during the deletion process.
-
-    Args:
-        server_id (str): The ID of the server to delete
-        request (Request): FastAPI request object (not used but required by route signature).
-        db (Session): Database session dependency
-        user (str): Authenticated user dependency
-
-    Returns:
-        RedirectResponse: A redirect to the admin dashboard catalog section with a
-        status code of 303 (See Other)
-    """
-    try:
-        logger.debug(f"User {user} is deleting server ID {server_id}")
-        await server_service.delete_server(db, server_id)
-    except Exception as e:
-        logger.error(f"Error deleting server: {e}")
-
-    form = await request.form()
-    is_inactive_checked = form.get("is_inactive_checked", "false")
-    root_path = request.scope.get("root_path", "")
-
-    if is_inactive_checked.lower() == "true":
-        return RedirectResponse(f"{root_path}/admin/?include_inactive=true#catalog", status_code=303)
-    return RedirectResponse(f"{root_path}/admin#catalog", status_code=303)
-
-
-@admin_router.get("/resources", response_model=List[ResourceRead])
-async def admin_list_resources(
-    include_inactive: bool = False,
-    db: Session = Depends(get_db),
-    user: str = Depends(require_auth),
-) -> List[ResourceRead]:
-    """
-    List resources for the admin UI with an option to include inactive resources.
-
-    This endpoint retrieves a list of resources from the database, optionally including
-    those that are inactive. The inactive filter is useful for administrators who need
-    to view or manage resources that have been deactivated but not deleted.
-
-    Args:
-        include_inactive (bool): Whether to include inactive resources in the results.
-        db (Session): Database session dependency.
-        user (str): Authenticated user dependency.
-
-    Returns:
-        List[ResourceRead]: A list of resource records formatted with by_alias=True.
-    """
-    logger.debug(f"User {user} requested resource list")
-    resources = await resource_service.list_resources(db, include_inactive=include_inactive)
-    return [resource.model_dump(by_alias=True) for resource in resources]
-
-
-@admin_router.get("/prompts", response_model=List[PromptRead])
-async def admin_list_prompts(
-    include_inactive: bool = False,
-    db: Session = Depends(get_db),
-    user: str = Depends(require_auth),
-) -> List[PromptRead]:
-    """
-    List prompts for the admin UI with an option to include inactive prompts.
-
-    This endpoint retrieves a list of prompts from the database, optionally including
-    those that are inactive. The inactive filter helps administrators see and manage
-    prompts that have been deactivated but not deleted from the system.
-
-    Args:
-        include_inactive (bool): Whether to include inactive prompts in the results.
-        db (Session): Database session dependency.
-        user (str): Authenticated user dependency.
-
-    Returns:
-        List[PromptRead]: A list of prompt records formatted with by_alias=True.
-    """
-    logger.debug(f"User {user} requested prompt list")
-    prompts = await prompt_service.list_prompts(db, include_inactive=include_inactive)
-    return [prompt.model_dump(by_alias=True) for prompt in prompts]
-
-
-@admin_router.get("/gateways", response_model=List[GatewayRead])
-async def admin_list_gateways(
-    include_inactive: bool = False,
-    db: Session = Depends(get_db),
-    user: str = Depends(require_auth),
-) -> List[GatewayRead]:
-    """
-    List gateways for the admin UI with an option to include inactive gateways.
-
-    This endpoint retrieves a list of gateways from the database, optionally
-    including those that are inactive. The inactive filter allows administrators
-    to view and manage gateways that have been deactivated but not deleted.
-
-    Args:
-        include_inactive (bool): Whether to include inactive gateways in the results.
-        db (Session): Database session dependency.
-        user (str): Authenticated user dependency.
-
-    Returns:
-        List[GatewayRead]: A list of gateway records formatted with by_alias=True.
-    """
-    logger.debug(f"User {user} requested gateway list")
-    gateways = await gateway_service.list_gateways(db, include_inactive=include_inactive)
-    return [gateway.model_dump(by_alias=True) for gateway in gateways]
-
-
-@admin_router.post("/gateways/{gateway_id}/toggle")
-async def admin_toggle_gateway(
-    gateway_id: str,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: str = Depends(require_auth),
-) -> RedirectResponse:
-    """
-    Toggle the active status of a gateway via the admin UI.
-
-    This endpoint allows an admin to toggle the active status of a gateway.
-    It expects a form field 'activate' with a value of "true" or "false" to
-    determine the new status of the gateway.
-
-    Args:
-        gateway_id (str): The ID of the gateway to toggle.
-        request (Request): The FastAPI request object containing form data.
-        db (Session): The database session dependency.
-        user (str): The authenticated user dependency.
-
-    Returns:
-        RedirectResponse: A redirect response to the admin dashboard with a
-        status code of 303 (See Other).
-    """
-    logger.debug(f"User {user} is toggling gateway ID {gateway_id}")
-    form = await request.form()
-    activate = form.get("activate", "true").lower() == "true"
-    is_inactive_checked = form.get("is_inactive_checked", "false")
-
-    try:
-        await gateway_service.toggle_gateway_status(db, gateway_id, activate)
-    except Exception as e:
-        logger.error(f"Error toggling gateway status: {e}")
-
-    root_path = request.scope.get("root_path", "")
-    if is_inactive_checked.lower() == "true":
-        return RedirectResponse(f"{root_path}/admin/?include_inactive=true#gateways", status_code=303)
-    return RedirectResponse(f"{root_path}/admin#gateways", status_code=303)
-
-
-@admin_router.get("/", name="admin_home", response_class=HTMLResponse)
-async def admin_ui(
-    request: Request,
-    include_inactive: bool = False,
-    db: Session = Depends(get_db),
-    user: str = Depends(require_basic_auth),
-    jwt_token: str = Depends(get_jwt_token),
-) -> HTMLResponse:
-    """
-    Render the admin dashboard HTML page.
-
-    This endpoint serves as the main entry point to the admin UI. It fetches data for
-    servers, tools, resources, prompts, gateways, and roots from their respective
-    services, then renders the admin dashboard template with this data.
-
-    The endpoint also sets a JWT token as a cookie for authentication in subsequent
-    requests. This token is HTTP-only for security reasons.
-
-    Args:
-        request (Request): FastAPI request object.
-        include_inactive (bool): Whether to include inactive items in all listings.
-        db (Session): Database session dependency.
-        user (str): Authenticated user from basic auth dependency.
-        jwt_token (str): JWT token for authentication.
-
-    Returns:
-        HTMLResponse: Rendered HTML template for the admin dashboard.
-    """
-    logger.debug(f"User {user} accessed the admin UI")
-    servers = [server.model_dump(by_alias=True) for server in await server_service.list_servers(db, include_inactive=include_inactive)]
-    tools = [tool.model_dump(by_alias=True) for tool in await tool_service.list_tools(db, include_inactive=include_inactive)]
-    resources = [resource.model_dump(by_alias=True) for resource in await resource_service.list_resources(db, include_inactive=include_inactive)]
-    prompts = [prompt.model_dump(by_alias=True) for prompt in await prompt_service.list_prompts(db, include_inactive=include_inactive)]
-    gateways = [gateway.model_dump(by_alias=True) for gateway in await gateway_service.list_gateways(db, include_inactive=include_inactive)]
-    roots = [root.model_dump(by_alias=True) for root in await root_service.list_roots()]
-    root_path = settings.app_root_path
-    response = request.app.state.templates.TemplateResponse(
-        request,
-        "admin.html",
-        {
-            "request": request,
-            "servers": servers,
-            "tools": tools,
-            "resources": resources,
-            "prompts": prompts,
-            "gateways": gateways,
-            "roots": roots,
-            "include_inactive": include_inactive,
-            "root_path": root_path,
-            "gateway_tool_name_separator": settings.gateway_tool_name_separator,
-        },
-    )
-
-    response.set_cookie(key="jwt_token", value=jwt_token, httponly=True, secure=False, samesite="Strict")  # JavaScript CAN'T read it  # only over HTTPS  # or "Lax" per your needs
-    return response
-
-
-@admin_router.get("/tools", response_model=List[ToolRead])
-async def admin_list_tools(
-    include_inactive: bool = False,
-    db: Session = Depends(get_db),
-    user: str = Depends(require_auth),
-) -> List[ToolRead]:
-    """
-    List tools for the admin UI with an option to include inactive tools.
-
-    This endpoint retrieves a list of tools from the database, optionally including
-    those that are inactive. The inactive filter helps administrators manage tools
-    that have been deactivated but not deleted from the system.
-
-    Args:
-        include_inactive (bool): Whether to include inactive tools in the results.
-        db (Session): Database session dependency.
-        user (str): Authenticated user dependency.
-
-    Returns:
-        List[ToolRead]: A list of tool records formatted with by_alias=True.
-    """
-    logger.debug(f"User {user} requested tool list")
-    tools = await tool_service.list_tools(db, include_inactive=include_inactive)
-    return [tool.model_dump(by_alias=True) for tool in tools]
-
-
-@admin_router.get("/tools/{tool_id}", response_model=ToolRead)
-async def admin_get_tool(tool_id: str, db: Session = Depends(get_db), user: str = Depends(require_auth)) -> ToolRead:
-    """
-    Retrieve specific tool details for the admin UI.
-
-    This endpoint fetches the details of a specific tool from the database
-    by its ID. It provides access to all information about the tool for
-    viewing and management purposes.
-
-    Args:
-        tool_id (str): The ID of the tool to retrieve.
-        db (Session): Database session dependency.
-        user (str): Authenticated user dependency.
-
-    Returns:
-        ToolRead: The tool details formatted with by_alias=True.
-    """
-    logger.debug(f"User {user} requested details for tool ID {tool_id}")
-    tool = await tool_service.get_tool(db, tool_id)
-    return tool.model_dump(by_alias=True)
-
-
-@admin_router.post("/tools/")
-@admin_router.post("/tools")
-async def admin_add_tool(
-    request: Request,
-    db: Session = Depends(get_db),
-    user: str = Depends(require_auth),
-) -> JSONResponse:
-    """
-    Add a tool via the admin UI with error handling.
-
-    Expects form fields:
-      - name
-      - url
-      - description (optional)
-      - requestType (mapped to request_type; defaults to "SSE")
-      - integrationType (mapped to integration_type; defaults to "MCP")
-      - headers (JSON string)
-      - input_schema (JSON string)
-      - jsonpath_filter (optional)
-      - auth_type (optional)
-      - auth_username (optional)
-      - auth_password (optional)
-      - auth_token (optional)
-      - auth_header_key (optional)
-      - auth_header_value (optional)
-
-    Logs the raw form data and assembled tool_data for debugging.
-
-    Args:
-        request (Request): the FastAPI request object containing the form data.
-        db (Session): the SQLAlchemy database session.
-        user (str): identifier of the authenticated user.
-
-    Returns:
-        JSONResponse: a JSON response with `{"message": ..., "success": ...}` and an appropriate HTTP status code.
-    """
-    logger.debug(f"User {user} is adding a new tool")
-    form = await request.form()
-    logger.debug(f"Received form data: {dict(form)}")
-
-    tool_data = {
-        "name": form["name"],
-        "url": form["url"],
-        "description": form.get("description"),
-        "request_type": form.get("requestType", "SSE"),
-        "integration_type": form.get("integrationType", "MCP"),
-        "headers": json.loads(form.get("headers") or "{}"),
-        "input_schema": json.loads(form.get("input_schema") or "{}"),
-        "jsonpath_filter": form.get("jsonpath_filter", ""),
-        "auth_type": form.get("auth_type", ""),
-        "auth_username": form.get("auth_username", ""),
-        "auth_password": form.get("auth_password", ""),
-        "auth_token": form.get("auth_token", ""),
-        "auth_header_key": form.get("auth_header_key", ""),
-        "auth_header_value": form.get("auth_header_value", ""),
-    }
-    logger.debug(f"Tool data built: {tool_data}")
-    try:
-        tool = ToolCreate(**tool_data)
-        logger.debug(f"Validated tool data: {tool.model_dump(by_alias=True)}")
-        await tool_service.register_tool(db, tool)
-        return JSONResponse(
-            content={"message": "Tool registered successfully!", "success": True},
-            status_code=200,
-        )
-    except ToolNameConflictError as e:
-        logger.error(f"ToolNameConflictError: {str(e)}")
-        return JSONResponse(content={"message": str(e), "success": False}, status_code=400)
-    except Exception as e:
-        logger.error(f"Error in admin_add_tool: {str(e)}")
-        return JSONResponse(content={"message": str(e), "success": False}, status_code=500)
-
-
-@admin_router.post("/tools/{tool_id}/edit/")
-@admin_router.post("/tools/{tool_id}/edit")
-async def admin_edit_tool(
-    tool_id: str,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: str = Depends(require_auth),
-) -> RedirectResponse:
-    """
-    Edit a tool via the admin UI.
-
-    Expects form fields:
-      - name
-      - url
-      - description (optional)
-      - requestType (to be mapped to request_type)
-      - integrationType (to be mapped to integration_type)
-      - headers (as a JSON string)
-      - input_schema (as a JSON string)
-      - jsonpathFilter (optional)
-      - auth_type (optional, string: "basic", "bearer", or empty)
-      - auth_username (optional, for basic auth)
-      - auth_password (optional, for basic auth)
-      - auth_token (optional, for bearer auth)
-      - auth_header_key (optional, for headers auth)
-      - auth_header_value (optional, for headers auth)
-
-    Assembles the tool_data dictionary by remapping form keys into the
-    snake-case keys expected by the schemas.
-
-    Args:
-        tool_id (str): The ID of the tool to edit.
-        request (Request): FastAPI request containing form data.
-        db (Session): Database session dependency.
-        user (str): Authenticated user dependency.
-
-    Returns:
-        RedirectResponse: A redirect response to the tools section of the admin
-        dashboard with a status code of 303 (See Other), or a JSON response with
-        an error message if the update fails.
-    """
-    logger.debug(f"User {user} is editing tool ID {tool_id}")
-    form = await request.form()
-    tool_data = {
-        "name": form["name"],
-        "url": form["url"],
-        "description": form.get("description"),
-        "request_type": form.get("requestType", "SSE"),
-        "integration_type": form.get("integrationType", "MCP"),
-        "headers": json.loads(form.get("headers") or "{}"),
-        "input_schema": json.loads(form.get("input_schema") or "{}"),
-        "jsonpath_filter": form.get("jsonpathFilter", ""),
-        "auth_type": form.get("auth_type", ""),
-        "auth_username": form.get("auth_username", ""),
-        "auth_password": form.get("auth_password", ""),
-        "auth_token": form.get("auth_token", ""),
-        "auth_header_key": form.get("auth_header_key", ""),
-        "auth_header_value": form.get("auth_header_value", ""),
-    }
-    logger.debug(f"Tool update data built: {tool_data}")
-    tool = ToolUpdate(**tool_data)
-    try:
-        await tool_service.update_tool(db, tool_id, tool)
-
-        root_path = request.scope.get("root_path", "")
-        is_inactive_checked = form.get("is_inactive_checked", "false")
-        if is_inactive_checked.lower() == "true":
-            return RedirectResponse(f"{root_path}/admin/?include_inactive=true#tools", status_code=303)
-        return RedirectResponse(f"{root_path}/admin#tools", status_code=303)
-    except ToolNameConflictError as e:
-        return JSONResponse(content={"message": str(e), "success": False}, status_code=400)
-    except ToolError as e:
-        return JSONResponse(content={"message": str(e), "success": False}, status_code=500)
-
-
-@admin_router.post("/tools/{tool_id}/delete")
-async def admin_delete_tool(tool_id: str, request: Request, db: Session = Depends(get_db), user: str = Depends(require_auth)) -> RedirectResponse:
-    """
-    Delete a tool via the admin UI.
-
-    This endpoint permanently removes a tool from the database using its ID.
-    It is irreversible and should be used with caution. The operation is logged,
-    and the user must be authenticated to access this route.
-
-    Args:
-        tool_id (str): The ID of the tool to delete.
-        request (Request): FastAPI request object (not used directly, but required by route signature).
-        db (Session): Database session dependency.
-        user (str): Authenticated user dependency.
-
-    Returns:
-        RedirectResponse: A redirect response to the tools section of the admin
-        dashboard with a status code of 303 (See Other).
-    """
-    logger.debug(f"User {user} is deleting tool ID {tool_id}")
-    await tool_service.delete_tool(db, tool_id)
-
-    form = await request.form()
-    is_inactive_checked = form.get("is_inactive_checked", "false")
-    root_path = request.scope.get("root_path", "")
-
-    if is_inactive_checked.lower() == "true":
-        return RedirectResponse(f"{root_path}/admin/?include_inactive=true#tools", status_code=303)
-    return RedirectResponse(f"{root_path}/admin#tools", status_code=303)
-
-
-@admin_router.post("/tools/{tool_id}/toggle")
-async def admin_toggle_tool(
-    tool_id: str,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: str = Depends(require_auth),
-) -> RedirectResponse:
-    """
-    Toggle a tool's active status via the admin UI.
-
-    This endpoint processes a form request to activate or deactivate a tool.
-    It expects a form field 'activate' with value "true" to activate the tool
-    or "false" to deactivate it. The endpoint handles exceptions gracefully and
-    logs any errors that might occur during the status toggle operation.
-
-    Args:
-        tool_id (str): The ID of the tool whose status to toggle.
-        request (Request): FastAPI request containing form data with the 'activate' field.
-        db (Session): Database session dependency.
-        user (str): Authenticated user dependency.
-
-    Returns:
-        RedirectResponse: A redirect to the admin dashboard tools section with a
-        status code of 303 (See Other).
-    """
-    logger.debug(f"User {user} is toggling tool ID {tool_id}")
-    form = await request.form()
-    activate = form.get("activate", "true").lower() == "true"
-    is_inactive_checked = form.get("is_inactive_checked", "false")
-    try:
-        await tool_service.toggle_tool_status(db, tool_id, activate, reachable=activate)
-    except Exception as e:
-        logger.error(f"Error toggling tool status: {e}")
-
-    root_path = request.scope.get("root_path", "")
-    if is_inactive_checked.lower() == "true":
-        return RedirectResponse(f"{root_path}/admin/?include_inactive=true#tools", status_code=303)
-    return RedirectResponse(f"{root_path}/admin#tools", status_code=303)
-
-
-@admin_router.get("/gateways/{gateway_id}", response_model=GatewayRead)
-async def admin_get_gateway(gateway_id: str, db: Session = Depends(get_db), user: str = Depends(require_auth)) -> GatewayRead:
-    """Get gateway details for the admin UI.
-
-    Args:
-        gateway_id: Gateway ID.
-        db: Database session.
-        user: Authenticated user.
-
-    Returns:
-        Gateway details.
-    """
-    logger.debug(f"User {user} requested details for gateway ID {gateway_id}")
-    gateway = await gateway_service.get_gateway(db, gateway_id)
-    return gateway.model_dump(by_alias=True)
-
-
-@admin_router.post("/gateways")
-async def admin_add_gateway(request: Request, db: Session = Depends(get_db), user: str = Depends(require_auth)) -> JSONResponse:
-    """Add a gateway via the admin UI.
-
-    Expects form fields:
-      - name
-      - url
-      - description (optional)
-
-    Args:
-        request: FastAPI request containing form data.
-        db: Database session.
-        user: Authenticated user.
-
-    Returns:
-        A redirect response to the admin dashboard.
-    """
-    logger.debug(f"User {user} is adding a new gateway")
-    form = await request.form()
-    gateway = GatewayCreate(
-        name=form["name"],
-        url=form["url"],
-        description=form.get("description"),
-        transport=form.get("transport", "SSE"),
-        auth_type=form.get("auth_type", ""),
-        auth_username=form.get("auth_username", ""),
-        auth_password=form.get("auth_password", ""),
-        auth_token=form.get("auth_token", ""),
-        auth_header_key=form.get("auth_header_key", ""),
-        auth_header_value=form.get("auth_header_value", ""),
-    )
-
-    try:
-        await gateway_service.register_gateway(db, gateway)
-        return JSONResponse(
-            content={"message": "Gateway registered successfully!", "success": True},
-            status_code=200,
-        )
-
-    except Exception as ex:
-        if isinstance(ex, GatewayConnectionError):
-            return JSONResponse(content={"message": str(ex), "success": False}, status_code=502)
-        if isinstance(ex, ValueError):
-            return JSONResponse(content={"message": str(ex), "success": False}, status_code=400)
-        if isinstance(ex, RuntimeError):
-            return JSONResponse(content={"message": str(ex), "success": False}, status_code=500)
-        if isinstance(ex, ValidationError):
-            return JSONResponse(content=ErrorFormatter.format_validation_error(ex), status_code=422)
-        if isinstance(ex, IntegrityError):
-            return JSONResponse(
-                status_code=409,
-                content=ErrorFormatter.format_database_error(ex)
-            )
-        return JSONResponse(content={"message": str(ex), "success": False}, status_code=500)
-
-
-@admin_router.post("/gateways/{gateway_id}/edit")
-async def admin_edit_gateway(
-    gateway_id: str,
-    request: Request,
-    db: Session = Depends(get_db),
-    user: str = Depends(require_auth),
-) -> RedirectResponse:
-    """Edit a gateway via the admin UI.
-
-    Expects form fields:
-      - name
-      - url
-      - description (optional)
-
-    Args:
-        gateway_id: Gateway ID.
-        request: FastAPI request containing form data.
-        db: Database session.
-        user: Authenticated user.
-
-    Returns:
-        A redirect response to the admin dashboard.
-    """
-    logger.debug(f"User {user} is editing gateway ID {gateway_id}")
-    form = await request.form()
-    gateway = GatewayUpdate(
-        name=form["name"],
-        url=form["url"],
-        description=form.get("description"),
-        transport=form.get("transport", "SSE"),
-        auth_type=form.get("auth_type", None),
-        auth_username=form.get("auth_username", None),
-        auth_password=form.get("auth_password", None),
-        auth_token=form.get("auth_token", None),
-        auth_header_key=form.get("auth_header_key", None),
-        auth_header_value=form.get("auth_header_value", None),
-    )
-    await gateway_service.update_gateway(db, gateway_id, gateway)
-
-    root_path = request.scope.get("root_path", "")
-    is_inactive_checked = form.get("is_inactive_checked", "false")
-
-    if is_inactive_checked.lower() == "true":
-        return RedirectResponse(f"{root_path}/admin/?include_inactive=true#gateways", status_code=303)
-    return RedirectResponse(f"{root_path}/admin#gateways", status_code=303)
-
-
-@admin_router.post("/gateways/{gateway_id}/delete")
-async def admin_delete_gateway(gateway_id: str, request: Request, db: Session = Depends(get_db), user: str = Depends(require_auth)) -> RedirectResponse:
-    """
-    Delete a gateway via the admin UI.
-
-    This endpoint removes a gateway from the database by its ID. The deletion is
-    permanent and cannot be undone. It requires authentication and logs the
-    operation for auditing purposes.
-
-    Args:
-        gateway_id (str): The ID of the gateway to delete.
-        request (Request): FastAPI request object (not used directly but required by the route signature).
-        db (Session): Database session dependency.
-        user (str): Authenticated user dependency.
-
-    Returns:
-        RedirectResponse: A redirect response to the gateways section of the admin
-        dashboard with a status code of 303 (See Other).
-    """
-    logger.debug(f"User {user} is deleting gateway ID {gateway_id}")
-    await gateway_service.delete_gateway(db, gateway_id)
-
-    form = await request.form()
-    is_inactive_checked = form.get("is_inactive_checked", "false")
-    root_path = request.scope.get("root_path", "")
-
-    if is_inactive_checked.lower() == "true":
-        return RedirectResponse(f"{root_path}/admin/?include_inactive=true#gateways", status_code=303)
-    return RedirectResponse(f"{root_path}/admin#gateways", status_code=303)
-
-
-@admin_router.get("/resources/{uri:path}")
-async def admin_get_resource(uri: str, db: Session = Depends(get_db), user: str = Depends(require_auth)) -> Dict[str, Any]:
-    """Get resource details for the admin UI.
-
-    Args:
-        uri: Resource URI.
-        db: Database session.
-        user: Authenticated user.
-
-    Returns:
-        A dictionary containing resource details and its content.
-    """
-    logger.debug(f"User {user} requested details for resource URI {uri}")
-    resource = await resource_service.get_resource_by_uri(db, uri)
-    content = await resource_service.read_resource(db, uri)
-    return {"resource": resource.model_dump(by_alias=True), "content": content}
-
-
 @admin_router.post("/resources")
 async def admin_add_resource(request: Request, db: Session = Depends(get_db), user: str = Depends(require_auth)) -> RedirectResponse:
-    """Add a resource via the admin UI.
+    """
+    Add a resource via the admin UI.
 
     Expects form fields:
       - uri
@@ -950,6 +451,37 @@ async def admin_add_resource(request: Request, db: Session = Depends(get_db), us
 
     Returns:
         A redirect response to the admin dashboard.
+
+    Examples:
+        >>> import asyncio
+        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> from fastapi import Request
+        >>> from fastapi.responses import RedirectResponse
+        >>> from starlette.datastructures import FormData
+        >>> 
+        >>> mock_db = MagicMock()
+        >>> mock_user = "test_user"
+        >>> form_data = FormData([
+        ...     ("uri", "test://resource1"),
+        ...     ("name", "Test Resource"),
+        ...     ("description", "A test resource"),
+        ...     ("mimeType", "text/plain"),
+        ...     ("content", "Sample content"),
+        ... ])
+        >>> mock_request = MagicMock(spec=Request)
+        >>> mock_request.form = AsyncMock(return_value=form_data)
+        >>> mock_request.scope = {"root_path": ""}
+        >>> 
+        >>> original_register_resource = resource_service.register_resource
+        >>> resource_service.register_resource = AsyncMock()
+        >>> 
+        >>> async def test_admin_add_resource():
+        ...     response = await admin_add_resource(mock_request, mock_db, mock_user)
+        ...     return isinstance(response, RedirectResponse) and response.status_code == 303
+        >>> 
+        >>> import asyncio; asyncio.run(test_admin_add_resource())
+        True
+        >>> resource_service.register_resource = original_register_resource
     """
     logger.debug(f"User {user} is adding a new resource")
     form = await request.form()
@@ -958,11 +490,10 @@ async def admin_add_resource(request: Request, db: Session = Depends(get_db), us
         name=form["name"],
         description=form.get("description"),
         mime_type=form.get("mimeType"),
-        template=form.get("template"),  # defaults to None if not provided
+        template=form.get("template"),
         content=form["content"],
     )
     await resource_service.register_resource(db, resource)
-
     root_path = request.scope.get("root_path", "")
     return RedirectResponse(f"{root_path}/admin#resources", status_code=303)
 
@@ -974,7 +505,8 @@ async def admin_edit_resource(
     db: Session = Depends(get_db),
     user: str = Depends(require_auth),
 ) -> RedirectResponse:
-    """Edit a resource via the admin UI.
+    """
+    Edit a resource via the admin UI.
 
     Expects form fields:
       - name
@@ -989,7 +521,54 @@ async def admin_edit_resource(
         user: Authenticated user.
 
     Returns:
-        A redirect response to the admin dashboard.
+        RedirectResponse: A redirect response to the admin dashboard.
+
+    Examples:
+        >>> import asyncio
+        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> from fastapi import Request
+        >>> from fastapi.responses import RedirectResponse
+        >>> from starlette.datastructures import FormData
+        >>> 
+        >>> mock_db = MagicMock()
+        >>> mock_user = "test_user"
+        >>> form_data = FormData([
+        ...     ("name", "Updated Resource"),
+        ...     ("description", "Updated description"),
+        ...     ("mimeType", "text/plain"),
+        ...     ("content", "Updated content"),
+        ... ])
+        >>> mock_request = MagicMock(spec=Request)
+        >>> mock_request.form = AsyncMock(return_value=form_data)
+        >>> mock_request.scope = {"root_path": ""}
+        >>> 
+        >>> original_update_resource = resource_service.update_resource
+        >>> resource_service.update_resource = AsyncMock()
+        >>> 
+        >>> async def test_admin_edit_resource():
+        ...     response = await admin_edit_resource("test://resource1", mock_request, mock_db, mock_user)
+        ...     return isinstance(response, RedirectResponse) and response.status_code == 303
+        >>> 
+        >>> import asyncio; asyncio.run(test_admin_edit_resource())
+        True
+        >>> 
+        >>> # Test with inactive checkbox checked
+        >>> form_data_inactive = FormData([
+        ...     ("name", "Updated Resource"),
+        ...     ("description", "Updated description"),
+        ...     ("mimeType", "text/plain"),
+        ...     ("content", "Updated content"),
+        ...     ("is_inactive_checked", "true")
+        ... ])
+        >>> mock_request.form = AsyncMock(return_value=form_data_inactive)
+        >>> 
+        >>> async def test_admin_edit_resource_inactive():
+        ...     response = await admin_edit_resource("test://resource1", mock_request, mock_db, mock_user)
+        ...     return isinstance(response, RedirectResponse) and "include_inactive=true" in response.headers["location"]
+        >>> 
+        >>> asyncio.run(test_admin_edit_resource_inactive())
+        True
+        >>> resource_service.update_resource = original_update_resource
     """
     logger.debug(f"User {user} is editing resource URI {uri}")
     form = await request.form()
@@ -1000,10 +579,8 @@ async def admin_edit_resource(
         content=form["content"],
     )
     await resource_service.update_resource(db, uri, resource)
-
     root_path = request.scope.get("root_path", "")
     is_inactive_checked = form.get("is_inactive_checked", "false")
-
     if is_inactive_checked.lower() == "true":
         return RedirectResponse(f"{root_path}/admin/?include_inactive=true#resources", status_code=303)
     return RedirectResponse(f"{root_path}/admin#resources", status_code=303)
@@ -1027,14 +604,48 @@ async def admin_delete_resource(uri: str, request: Request, db: Session = Depend
     Returns:
         RedirectResponse: A redirect response to the resources section of the admin
         dashboard with a status code of 303 (See Other).
+
+    Examples:
+        >>> import asyncio
+        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> from fastapi import Request
+        >>> from fastapi.responses import RedirectResponse
+        >>> from starlette.datastructures import FormData
+        >>> 
+        >>> mock_db = MagicMock()
+        >>> mock_user = "test_user"
+        >>> mock_request = MagicMock(spec=Request)
+        >>> form_data = FormData([("is_inactive_checked", "false")])
+        >>> mock_request.form = AsyncMock(return_value=form_data)
+        >>> mock_request.scope = {"root_path": ""}
+        >>> 
+        >>> original_delete_resource = resource_service.delete_resource
+        >>> resource_service.delete_resource = AsyncMock()
+        >>> 
+        >>> async def test_admin_delete_resource():
+        ...     response = await admin_delete_resource("test://resource1", mock_request, mock_db, mock_user)
+        ...     return isinstance(response, RedirectResponse) and response.status_code == 303
+        >>> 
+        >>> import asyncio; asyncio.run(test_admin_delete_resource())
+        True
+        >>> 
+        >>> # Test with inactive checkbox checked
+        >>> form_data_inactive = FormData([("is_inactive_checked", "true")])
+        >>> mock_request.form = AsyncMock(return_value=form_data_inactive)
+        >>> 
+        >>> async def test_admin_delete_resource_inactive():
+        ...     response = await admin_delete_resource("test://resource1", mock_request, mock_user)
+        ...     return isinstance(response, RedirectResponse) and "include_inactive=true" in response.headers["location"]
+        >>> 
+        >>> asyncio.run(test_admin_delete_resource_inactive())
+        True
+        >>> resource_service.delete_resource = original_delete_resource
     """
     logger.debug(f"User {user} is deleting resource URI {uri}")
     await resource_service.delete_resource(db, uri)
-
     form = await request.form()
     is_inactive_checked = form.get("is_inactive_checked", "false")
     root_path = request.scope.get("root_path", "")
-
     if is_inactive_checked.lower() == "true":
         return RedirectResponse(f"{root_path}/admin/?include_inactive=true#resources", status_code=303)
     return RedirectResponse(f"{root_path}/admin#resources", status_code=303)
@@ -1064,6 +675,77 @@ async def admin_toggle_resource(
     Returns:
         RedirectResponse: A redirect to the admin dashboard resources section with a
         status code of 303 (See Other).
+
+    Examples:
+        >>> import asyncio
+        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> from fastapi import Request
+        >>> from fastapi.responses import RedirectResponse
+        >>> from starlette.datastructures import FormData
+        >>> 
+        >>> mock_db = MagicMock()
+        >>> mock_user = "test_user"
+        >>> mock_request = MagicMock(spec=Request)
+        >>> form_data = FormData([
+        ...     ("activate", "true"),
+        ...     ("is_inactive_checked", "false")
+        ... ])
+        >>> mock_request.form = AsyncMock(return_value=form_data)
+        >>> mock_request.scope = {"root_path": ""}
+        >>> 
+        >>> original_toggle_resource_status = resource_service.toggle_resource_status
+        >>> resource_service.toggle_resource_status = AsyncMock()
+        >>> 
+        >>> async def test_admin_toggle_resource():
+        ...     response = await admin_toggle_resource(1, mock_request, mock_db, mock_user)
+        ...     return isinstance(response, RedirectResponse) and response.status_code == 303
+        >>> 
+        >>> import asyncio; asyncio.run(test_admin_toggle_resource())
+        True
+        >>> 
+        >>> # Test with activate=false
+        >>> form_data_deactivate = FormData([
+        ...     ("activate", "false"),
+        ...     ("is_inactive_checked", "false")
+        ... ])
+        >>> mock_request.form = AsyncMock(return_value=form_data_deactivate)
+        >>> 
+        >>> async def test_admin_toggle_resource_deactivate():
+        ...     response = await admin_toggle_resource(1, mock_request, mock_db, mock_user)
+        ...     return isinstance(response, RedirectResponse) and response.status_code == 303
+        >>> 
+        >>> asyncio.run(test_admin_toggle_resource_deactivate())
+        True
+        >>> 
+        >>> # Test with inactive checkbox checked
+        >>> form_data_inactive = FormData([
+        ...     ("activate", "true"),
+        ...     ("is_inactive_checked", "true")
+        ... ])
+        >>> mock_request.form = AsyncMock(return_value=form_data_inactive)
+        >>> 
+        >>> async def test_admin_toggle_resource_inactive():
+        ...     response = await admin_toggle_resource(1, mock_request, mock_db, mock_user)
+        ...     return isinstance(response, RedirectResponse) and "include_inactive=true" in response.headers["location"]
+        >>> 
+        >>> asyncio.run(test_admin_toggle_resource_inactive())
+        True
+        >>> 
+        >>> # Test exception handling
+        >>> resource_service.toggle_resource_status = AsyncMock(side_effect=Exception("Test error"))
+        >>> form_data_error = FormData([
+        ...     ("activate", "true"),
+        ...     ("is_inactive_checked", "false")
+        ... ])
+        >>> mock_request.form = AsyncMock(return_value=form_data_error)
+        >>> 
+        >>> async def test_admin_toggle_resource_exception():
+        ...     response = await admin_toggle_resource(1, mock_request, mock_db, mock_user)
+        ...     return isinstance(response, RedirectResponse) and response.status_code == 303
+        >>> 
+        >>> asyncio.run(test_admin_toggle_resource_exception())
+        True
+        >>> resource_service.toggle_resource_status = original_toggle_resource_status
     """
     logger.debug(f"User {user} is toggling resource ID {resource_id}")
     form = await request.form()
@@ -1091,6 +773,51 @@ async def admin_get_prompt(name: str, db: Session = Depends(get_db), user: str =
 
     Returns:
         A dictionary with prompt details.
+
+    Examples:
+        >>> import asyncio
+        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> from mcpgateway.schemas import PromptRead
+        >>> from datetime import datetime, timezone
+        >>> 
+        >>> mock_db = MagicMock()
+        >>> mock_user = "test_user"
+        >>> prompt_name = "test-prompt"
+        >>> 
+        >>> # Mock prompt details
+        >>> from mcpgateway.schemas import PromptMetrics
+        >>> mock_metrics = PromptMetrics(
+        ...     total_executions=3,
+        ...     successful_executions=3,
+        ...     failed_executions=0,
+        ...     failure_rate=0.0,
+        ...     min_response_time=0.1,
+        ...     max_response_time=0.5,
+        ...     avg_response_time=0.3,
+        ...     last_execution_time=datetime.now(timezone.utc)
+        ... )
+        >>> mock_prompt_details = {
+        ...     "id": 1,
+        ...     "name": prompt_name,
+        ...     "description": "A test prompt",
+        ...     "template": "Hello {{name}}!",
+        ...     "arguments": [{"name": "name", "type": "string"}],
+        ...     "created_at": datetime.now(timezone.utc),
+        ...     "updated_at": datetime.now(timezone.utc),
+        ...     "is_active": True,
+        ...     "metrics": mock_metrics
+        ... }
+        >>> 
+        >>> original_get_prompt_details = prompt_service.get_prompt_details
+        >>> prompt_service.get_prompt_details = AsyncMock(return_value=mock_prompt_details)
+        >>> 
+        >>> async def test_admin_get_prompt():
+        ...     result = await admin_get_prompt(prompt_name, mock_db, mock_user)
+        ...     return isinstance(result, dict) and result.get("name") == prompt_name
+        >>> 
+        >>> asyncio.run(test_admin_get_prompt())
+        True
+        >>> prompt_service.get_prompt_details = original_get_prompt_details
     """
     logger.debug(f"User {user} requested details for prompt name {name}")
     prompt_details = await prompt_service.get_prompt_details(db, name)
@@ -1116,6 +843,36 @@ async def admin_add_prompt(request: Request, db: Session = Depends(get_db), user
 
     Returns:
         A redirect response to the admin dashboard.
+
+    Examples:
+        >>> import asyncio
+        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> from fastapi import Request
+        >>> from fastapi.responses import RedirectResponse
+        >>> from starlette.datastructures import FormData
+        >>> 
+        >>> mock_db = MagicMock()
+        >>> mock_user = "test_user"
+        >>> form_data = FormData([
+        ...     ("name", "Test Prompt"),
+        ...     ("description", "A test prompt"),
+        ...     ("template", "Hello {{name}}!"),
+        ...     ("arguments", '[{"name": "name", "type": "string"}]'),
+        ... ])
+        >>> mock_request = MagicMock(spec=Request)
+        >>> mock_request.form = AsyncMock(return_value=form_data)
+        >>> mock_request.scope = {"root_path": ""}
+        >>> 
+        >>> original_register_prompt = prompt_service.register_prompt
+        >>> prompt_service.register_prompt = AsyncMock()
+        >>> 
+        >>> async def test_admin_add_prompt():
+        ...     response = await admin_add_prompt(mock_request, mock_db, mock_user)
+        ...     return isinstance(response, RedirectResponse) and response.status_code == 303
+        >>> 
+        >>> asyncio.run(test_admin_add_prompt())
+        True
+        >>> prompt_service.register_prompt = original_register_prompt
     """
     logger.debug(f"User {user} is adding a new prompt")
     form = await request.form()
@@ -1156,6 +913,54 @@ async def admin_edit_prompt(
 
     Returns:
         A redirect response to the admin dashboard.
+
+    Examples:
+        >>> import asyncio
+        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> from fastapi import Request
+        >>> from fastapi.responses import RedirectResponse
+        >>> from starlette.datastructures import FormData
+        >>> 
+        >>> mock_db = MagicMock()
+        >>> mock_user = "test_user"
+        >>> prompt_name = "test-prompt"
+        >>> form_data = FormData([
+        ...     ("name", "Updated Prompt"),
+        ...     ("description", "Updated description"),
+        ...     ("template", "Hello {{name}}, welcome!"),
+        ...     ("arguments", '[{"name": "name", "type": "string"}]'),
+        ...     ("is_inactive_checked", "false")
+        ... ])
+        >>> mock_request = MagicMock(spec=Request)
+        >>> mock_request.form = AsyncMock(return_value=form_data)
+        >>> mock_request.scope = {"root_path": ""}
+        >>> 
+        >>> original_update_prompt = prompt_service.update_prompt
+        >>> prompt_service.update_prompt = AsyncMock()
+        >>> 
+        >>> async def test_admin_edit_prompt():
+        ...     response = await admin_edit_prompt(prompt_name, mock_request, mock_db, mock_user)
+        ...     return isinstance(response, RedirectResponse) and response.status_code == 303
+        >>> 
+        >>> asyncio.run(test_admin_edit_prompt())
+        True
+        >>> 
+        >>> # Test with inactive checkbox checked
+        >>> form_data_inactive = FormData([
+        ...     ("name", "Updated Prompt"),
+        ...     ("template", "Hello {{name}}!"),
+        ...     ("arguments", "[]"),
+        ...     ("is_inactive_checked", "true")
+        ... ])
+        >>> mock_request.form = AsyncMock(return_value=form_data_inactive)
+        >>> 
+        >>> async def test_admin_edit_prompt_inactive():
+        ...     response = await admin_edit_prompt(prompt_name, mock_request, mock_db, mock_user)
+        ...     return isinstance(response, RedirectResponse) and "include_inactive=true" in response.headers["location"]
+        >>> 
+        >>> asyncio.run(test_admin_edit_prompt_inactive())
+        True
+        >>> prompt_service.update_prompt = original_update_prompt
     """
     logger.debug(f"User {user} is editing prompt name {name}")
     form = await request.form()
@@ -1195,14 +1000,48 @@ async def admin_delete_prompt(name: str, request: Request, db: Session = Depends
     Returns:
         RedirectResponse: A redirect response to the prompts section of the admin
         dashboard with a status code of 303 (See Other).
+
+    Examples:
+        >>> import asyncio
+        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> from fastapi import Request
+        >>> from fastapi.responses import RedirectResponse
+        >>> from starlette.datastructures import FormData
+        >>> 
+        >>> mock_db = MagicMock()
+        >>> mock_user = "test_user"
+        >>> mock_request = MagicMock(spec=Request)
+        >>> form_data = FormData([("is_inactive_checked", "false")])
+        >>> mock_request.form = AsyncMock(return_value=form_data)
+        >>> mock_request.scope = {"root_path": ""}
+        >>> 
+        >>> original_delete_prompt = prompt_service.delete_prompt
+        >>> prompt_service.delete_prompt = AsyncMock()
+        >>> 
+        >>> async def test_admin_delete_prompt():
+        ...     response = await admin_delete_prompt("test-prompt", mock_request, mock_db, mock_user)
+        ...     return isinstance(response, RedirectResponse) and response.status_code == 303
+        >>> 
+        >>> import asyncio; asyncio.run(test_admin_delete_prompt())
+        True
+        >>> 
+        >>> # Test with inactive checkbox checked
+        >>> form_data_inactive = FormData([("is_inactive_checked", "true")])
+        >>> mock_request.form = AsyncMock(return_value=form_data_inactive)
+        >>> 
+        >>> async def test_admin_delete_prompt_inactive():
+        ...     response = await admin_delete_prompt("test-prompt", mock_request, mock_db, mock_user)
+        ...     return isinstance(response, RedirectResponse) and "include_inactive=true" in response.headers["location"]
+        >>> 
+        >>> asyncio.run(test_admin_delete_prompt_inactive())
+        True
+        >>> prompt_service.delete_prompt = original_delete_prompt
     """
     logger.debug(f"User {user} is deleting prompt name {name}")
     await prompt_service.delete_prompt(db, name)
-
     form = await request.form()
     is_inactive_checked = form.get("is_inactive_checked", "false")
     root_path = request.scope.get("root_path", "")
-
     if is_inactive_checked.lower() == "true":
         return RedirectResponse(f"{root_path}/admin/?include_inactive=true#prompts", status_code=303)
     return RedirectResponse(f"{root_path}/admin#prompts", status_code=303)
@@ -1232,6 +1071,77 @@ async def admin_toggle_prompt(
     Returns:
         RedirectResponse: A redirect to the admin dashboard prompts section with a
         status code of 303 (See Other).
+
+    Examples:
+        >>> import asyncio
+        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> from fastapi import Request
+        >>> from fastapi.responses import RedirectResponse
+        >>> from starlette.datastructures import FormData
+        >>> 
+        >>> mock_db = MagicMock()
+        >>> mock_user = "test_user"
+        >>> mock_request = MagicMock(spec=Request)
+        >>> form_data = FormData([
+        ...     ("activate", "true"),
+        ...     ("is_inactive_checked", "false")
+        ... ])
+        >>> mock_request.form = AsyncMock(return_value=form_data)
+        >>> mock_request.scope = {"root_path": ""}
+        >>> 
+        >>> original_toggle_prompt_status = prompt_service.toggle_prompt_status
+        >>> prompt_service.toggle_prompt_status = AsyncMock()
+        >>> 
+        >>> async def test_admin_toggle_prompt():
+        ...     response = await admin_toggle_prompt(1, mock_request, mock_db, mock_user)
+        ...     return isinstance(response, RedirectResponse) and response.status_code == 303
+        >>> 
+        >>> import asyncio; asyncio.run(test_admin_toggle_prompt())
+        True
+        >>> 
+        >>> # Test with activate=false
+        >>> form_data_deactivate = FormData([
+        ...     ("activate", "false"),
+        ...     ("is_inactive_checked", "false")
+        ... ])
+        >>> mock_request.form = AsyncMock(return_value=form_data_deactivate)
+        >>> 
+        >>> async def test_admin_toggle_prompt_deactivate():
+        ...     response = await admin_toggle_prompt(1, mock_request, mock_db, mock_user)
+        ...     return isinstance(response, RedirectResponse) and response.status_code == 303
+        >>> 
+        >>> asyncio.run(test_admin_toggle_prompt_deactivate())
+        True
+        >>> 
+        >>> # Test with inactive checkbox checked
+        >>> form_data_inactive = FormData([
+        ...     ("activate", "true"),
+        ...     ("is_inactive_checked", "true")
+        ... ])
+        >>> mock_request.form = AsyncMock(return_value=form_data_inactive)
+        >>> 
+        >>> async def test_admin_toggle_prompt_inactive():
+        ...     response = await admin_toggle_prompt(1, mock_request, mock_db, mock_user)
+        ...     return isinstance(response, RedirectResponse) and "include_inactive=true" in response.headers["location"]
+        >>> 
+        >>> asyncio.run(test_admin_toggle_prompt_inactive())
+        True
+        >>> 
+        >>> # Test exception handling
+        >>> prompt_service.toggle_prompt_status = AsyncMock(side_effect=Exception("Test error"))
+        >>> form_data_error = FormData([
+        ...     ("activate", "true"),
+        ...     ("is_inactive_checked", "false")
+        ... ])
+        >>> mock_request.form = AsyncMock(return_value=form_data_error)
+        >>> 
+        >>> async def test_admin_toggle_prompt_exception():
+        ...     response = await admin_toggle_prompt(1, mock_request, mock_db, mock_user)
+        ...     return isinstance(response, RedirectResponse) and response.status_code == 303
+        >>> 
+        >>> asyncio.run(test_admin_toggle_prompt_exception())
+        True
+        >>> prompt_service.toggle_prompt_status = original_toggle_prompt_status
     """
     logger.debug(f"User {user} is toggling prompt ID {prompt_id}")
     form = await request.form()
@@ -1261,14 +1171,40 @@ async def admin_add_root(request: Request, user: str = Depends(require_auth)) ->
         user: Authenticated user.
 
     Returns:
-        A redirect response to the admin dashboard.
+        RedirectResponse: A redirect response to the admin dashboard.
+
+    Examples:
+        >>> import asyncio
+        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> from fastapi import Request
+        >>> from fastapi.responses import RedirectResponse
+        >>> from starlette.datastructures import FormData
+        >>> 
+        >>> mock_user = "test_user"
+        >>> mock_request = MagicMock(spec=Request)
+        >>> form_data = FormData([
+        ...     ("uri", "test://root1"),
+        ...     ("name", "Test Root"),
+        ... ])
+        >>> mock_request.form = AsyncMock(return_value=form_data)
+        >>> mock_request.scope = {"root_path": ""}
+        >>> 
+        >>> original_add_root = root_service.add_root
+        >>> root_service.add_root = AsyncMock()
+        >>> 
+        >>> async def test_admin_add_root():
+        ...     response = await admin_add_root(mock_request, mock_user)
+        ...     return isinstance(response, RedirectResponse) and response.status_code == 303
+        >>> 
+        >>> import asyncio; asyncio.run(test_admin_add_root())
+        True
+        >>> root_service.add_root = original_add_root
     """
     logger.debug(f"User {user} is adding a new root")
     form = await request.form()
     uri = form["uri"]
     name = form.get("name")
     await root_service.add_root(uri, name)
-
     root_path = request.scope.get("root_path", "")
     return RedirectResponse(f"{root_path}/admin#roots", status_code=303)
 
@@ -1290,14 +1226,47 @@ async def admin_delete_root(uri: str, request: Request, user: str = Depends(requ
     Returns:
         RedirectResponse: A redirect response to the roots section of the admin
         dashboard with a status code of 303 (See Other).
+
+    Examples:
+        >>> import asyncio
+        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> from fastapi import Request
+        >>> from fastapi.responses import RedirectResponse
+        >>> from starlette.datastructures import FormData
+        >>> 
+        >>> mock_user = "test_user"
+        >>> mock_request = MagicMock(spec=Request)
+        >>> form_data = FormData([("is_inactive_checked", "false")])
+        >>> mock_request.form = AsyncMock(return_value=form_data)
+        >>> mock_request.scope = {"root_path": ""}
+        >>> 
+        >>> original_remove_root = root_service.remove_root
+        >>> root_service.remove_root = AsyncMock()
+        >>> 
+        >>> async def test_admin_delete_root():
+        ...     response = await admin_delete_root("test://root1", mock_request, mock_user)
+        ...     return isinstance(response, RedirectResponse) and response.status_code == 303
+        >>> 
+        >>> import asyncio; asyncio.run(test_admin_delete_root())
+        True
+        >>> 
+        >>> # Test with inactive checkbox checked
+        >>> form_data_inactive = FormData([("is_inactive_checked", "true")])
+        >>> mock_request.form = AsyncMock(return_value=form_data_inactive)
+        >>> 
+        >>> async def test_admin_delete_root_inactive():
+        ...     response = await admin_delete_root("test://root1", mock_request, mock_user)
+        ...     return isinstance(response, RedirectResponse) and "include_inactive=true" in response.headers["location"]
+        >>> 
+        >>> asyncio.run(test_admin_delete_root_inactive())
+        True
+        >>> root_service.remove_root = original_remove_root
     """
     logger.debug(f"User {user} is deleting root URI {uri}")
     await root_service.remove_root(uri)
-
     form = await request.form()
     root_path = request.scope.get("root_path", "")
     is_inactive_checked = form.get("is_inactive_checked", "false")
-
     if is_inactive_checked.lower() == "true":
         return RedirectResponse(f"{root_path}/admin/?include_inactive=true#roots", status_code=303)
     return RedirectResponse(f"{root_path}/admin#roots", status_code=303)
@@ -1329,6 +1298,83 @@ async def admin_get_metrics(
         MetricsDict: A dictionary containing the aggregated metrics for tools,
         resources, servers, and prompts. Each value is a Pydantic model instance
         specific to the entity type.
+
+    Examples:
+        >>> import asyncio
+        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> from mcpgateway.schemas import ToolMetrics, ResourceMetrics, ServerMetrics, PromptMetrics
+        >>> 
+        >>> mock_db = MagicMock()
+        >>> mock_user = "test_user"
+        >>> 
+        >>> mock_tool_metrics = ToolMetrics(
+        ...     total_executions=10,
+        ...     successful_executions=9,
+        ...     failed_executions=1,
+        ...     failure_rate=0.1,
+        ...     min_response_time=0.05,
+        ...     max_response_time=1.0,
+        ...     avg_response_time=0.3,
+        ...     last_execution_time=None
+        ... )
+        >>> mock_resource_metrics = ResourceMetrics(
+        ...     total_executions=5,
+        ...     successful_executions=5,
+        ...     failed_executions=0,
+        ...     failure_rate=0.0,
+        ...     min_response_time=0.1,
+        ...     max_response_time=0.5,
+        ...     avg_response_time=0.2,
+        ...     last_execution_time=None
+        ... )
+        >>> mock_server_metrics = ServerMetrics(
+        ...     total_executions=7,
+        ...     successful_executions=7,
+        ...     failed_executions=0,
+        ...     failure_rate=0.0,
+        ...     min_response_time=0.2,
+        ...     max_response_time=0.7,
+        ...     avg_response_time=0.4,
+        ...     last_execution_time=None
+        ... )
+        >>> mock_prompt_metrics = PromptMetrics(
+        ...     total_executions=3,
+        ...     successful_executions=3,
+        ...     failed_executions=0,
+        ...     failure_rate=0.0,
+        ...     min_response_time=0.15,
+        ...     max_response_time=0.6,
+        ...     avg_response_time=0.35,
+        ...     last_execution_time=None
+        ... )
+        >>> 
+        >>> original_aggregate_metrics_tool = tool_service.aggregate_metrics
+        >>> original_aggregate_metrics_resource = resource_service.aggregate_metrics
+        >>> original_aggregate_metrics_server = server_service.aggregate_metrics
+        >>> original_aggregate_metrics_prompt = prompt_service.aggregate_metrics
+        >>> 
+        >>> tool_service.aggregate_metrics = AsyncMock(return_value=mock_tool_metrics)
+        >>> resource_service.aggregate_metrics = AsyncMock(return_value=mock_resource_metrics)
+        >>> server_service.aggregate_metrics = AsyncMock(return_value=mock_server_metrics)
+        >>> prompt_service.aggregate_metrics = AsyncMock(return_value=mock_prompt_metrics)
+        >>> 
+        >>> async def test_admin_get_metrics():
+        ...     result = await admin_get_metrics(mock_db, mock_user)
+        ...     return (
+        ...         isinstance(result, dict) and
+        ...         result.get("tools") == mock_tool_metrics and
+        ...         result.get("resources") == mock_resource_metrics and
+        ...         result.get("servers") == mock_server_metrics and
+        ...         result.get("prompts") == mock_prompt_metrics
+        ...     )
+        >>> 
+        >>> import asyncio; asyncio.run(test_admin_get_metrics())
+        True
+        >>> 
+        >>> tool_service.aggregate_metrics = original_aggregate_metrics_tool
+        >>> resource_service.aggregate_metrics = original_aggregate_metrics_resource
+        >>> server_service.aggregate_metrics = original_aggregate_metrics_server
+        >>> prompt_service.aggregate_metrics = original_aggregate_metrics_prompt
     """
     logger.debug(f"User {user} requested aggregate metrics")
     tool_metrics = await tool_service.aggregate_metrics(db)
@@ -1336,7 +1382,6 @@ async def admin_get_metrics(
     server_metrics = await server_service.aggregate_metrics(db)
     prompt_metrics = await prompt_service.aggregate_metrics(db)
 
-    # Return actual Pydantic model instances
     return {
         "tools": tool_metrics,
         "resources": resource_metrics,
@@ -1357,6 +1402,35 @@ async def admin_reset_metrics(db: Session = Depends(get_db), user: str = Depends
 
     Returns:
         Dict[str, object]: A dictionary containing a success message and status.
+
+    Examples:
+        >>> import asyncio
+        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> 
+        >>> mock_db = MagicMock()
+        >>> mock_user = "test_user"
+        >>> 
+        >>> original_reset_metrics_tool = tool_service.reset_metrics
+        >>> original_reset_metrics_resource = resource_service.reset_metrics
+        >>> original_reset_metrics_server = server_service.reset_metrics
+        >>> original_reset_metrics_prompt = prompt_service.reset_metrics
+        >>> 
+        >>> tool_service.reset_metrics = AsyncMock()
+        >>> resource_service.reset_metrics = AsyncMock()
+        >>> server_service.reset_metrics = AsyncMock()
+        >>> prompt_service.reset_metrics = AsyncMock()
+        >>> 
+        >>> async def test_admin_reset_metrics():
+        ...     result = await admin_reset_metrics(mock_db, mock_user)
+        ...     return result == {"message": "All metrics reset successfully", "success": True}
+        >>> 
+        >>> import asyncio; asyncio.run(test_admin_reset_metrics())
+        True
+        >>> 
+        >>> tool_service.reset_metrics = original_reset_metrics_tool
+        >>> resource_service.reset_metrics = original_reset_metrics_resource
+        >>> server_service.reset_metrics = original_reset_metrics_server
+        >>> prompt_service.reset_metrics = original_reset_metrics_prompt
     """
     logger.debug(f"User {user} requested to reset all metrics")
     await tool_service.reset_metrics(db)
@@ -1378,6 +1452,132 @@ async def admin_test_gateway(request: GatewayTestRequest, user: str = Depends(re
 
     Returns:
         GatewayTestResponse: The response from the gateway, including status code, latency, and body
+
+    Examples:
+        >>> import asyncio
+        >>> from unittest.mock import AsyncMock, MagicMock
+        >>> from mcpgateway.schemas import GatewayTestRequest, GatewayTestResponse
+        >>> from fastapi import Request
+        >>> import httpx
+        >>> 
+        >>> mock_user = "test_user"
+        >>> mock_request = GatewayTestRequest(
+        ...     base_url="https://api.example.com",
+        ...     path="/test",
+        ...     method="GET",
+        ...     headers={},
+        ...     body=None
+        ... )
+        >>> 
+        >>> # Mock ResilientHttpClient to simulate a successful response
+        >>> class MockResponse:
+        ...     def __init__(self):
+        ...         self.status_code = 200
+        ...         self._json = {"message": "success"}
+        ...     def json(self):
+        ...         return self._json
+        ...     @property
+        ...     def text(self):
+        ...         return str(self._json)
+        >>> 
+        >>> class MockClient:
+        ...     async def __aenter__(self):
+        ...         return self
+        ...     async def __aexit__(self, exc_type, exc, tb):
+        ...         pass
+        ...     async def request(self, method, url, headers=None, json=None):
+        ...         return MockResponse()
+        >>> 
+        >>> from unittest.mock import patch
+        >>> 
+        >>> async def test_admin_test_gateway():
+        ...     with patch('mcpgateway.admin.ResilientHttpClient') as mock_client_class:
+        ...         mock_client_class.return_value = MockClient()
+        ...         response = await admin_test_gateway(mock_request, mock_user)
+        ...         return isinstance(response, GatewayTestResponse) and response.status_code == 200
+        >>> 
+        >>> result = asyncio.run(test_admin_test_gateway())
+        >>> result
+        True
+        >>> 
+        >>> # Test with JSON decode error
+        >>> class MockResponseTextOnly:
+        ...     def __init__(self):
+        ...         self.status_code = 200
+        ...         self.text = "plain text response"
+        ...     def json(self):
+        ...         raise json.JSONDecodeError("Invalid JSON", "doc", 0)
+        >>> 
+        >>> class MockClientTextOnly:
+        ...     async def __aenter__(self):
+        ...         return self
+        ...     async def __aexit__(self, exc_type, exc, tb):
+        ...         pass
+        ...     async def request(self, method, url, headers=None, json=None):
+        ...         return MockResponseTextOnly()
+        >>> 
+        >>> async def test_admin_test_gateway_text_response():
+        ...     with patch('mcpgateway.admin.ResilientHttpClient') as mock_client_class:
+        ...         mock_client_class.return_value = MockClientTextOnly()
+        ...         response = await admin_test_gateway(mock_request, mock_user)
+        ...         return isinstance(response, GatewayTestResponse) and response.body.get("details") == "plain text response"
+        >>> 
+        >>> asyncio.run(test_admin_test_gateway_text_response())
+        True
+        >>> 
+        >>> # Test with network error
+        >>> class MockClientError:
+        ...     async def __aenter__(self):
+        ...         return self
+        ...     async def __aexit__(self, exc_type, exc, tb):
+        ...         pass
+        ...     async def request(self, method, url, headers=None, json=None):
+        ...         raise httpx.RequestError("Network error")
+        >>> 
+        >>> async def test_admin_test_gateway_network_error():
+        ...     with patch('mcpgateway.admin.ResilientHttpClient') as mock_client_class:
+        ...         mock_client_class.return_value = MockClientError()
+        ...         response = await admin_test_gateway(mock_request, mock_user)
+        ...         return response.status_code == 502 and "Network error" in str(response.body)
+        >>> 
+        >>> asyncio.run(test_admin_test_gateway_network_error())
+        True
+        >>> 
+        >>> # Test with POST method and body
+        >>> mock_request_post = GatewayTestRequest(
+        ...     base_url="https://api.example.com",
+        ...     path="/test",
+        ...     method="POST",
+        ...     headers={"Content-Type": "application/json"},
+        ...     body={"test": "data"}
+        ... )
+        >>> 
+        >>> async def test_admin_test_gateway_post():
+        ...     with patch('mcpgateway.admin.ResilientHttpClient') as mock_client_class:
+        ...         mock_client_class.return_value = MockClient()
+        ...         response = await admin_test_gateway(mock_request_post, mock_user)
+        ...         return isinstance(response, GatewayTestResponse) and response.status_code == 200
+        >>> 
+        >>> asyncio.run(test_admin_test_gateway_post())
+        True
+        >>> 
+        >>> # Test URL path handling with trailing slashes
+        >>> mock_request_trailing = GatewayTestRequest(
+        ...     base_url="https://api.example.com/",
+        ...     path="/test/",
+        ...     method="GET",
+        ...     headers={},
+        ...     body=None
+        ... )
+        >>> 
+        >>> async def test_admin_test_gateway_trailing_slash():
+        ...     with patch('mcpgateway.admin.ResilientHttpClient') as mock_client_class:
+        ...         mock_client_class.return_value = MockClient()
+        ...         response = await admin_test_gateway(mock_request_trailing, mock_user)
+        ...         return isinstance(response, GatewayTestResponse) and response.status_code == 200
+        >>> 
+        >>> asyncio.run(test_admin_test_gateway_trailing_slash())
+        True
     """
     full_url = str(request.base_url).rstrip("/") + "/" + request.path.lstrip("/")
     full_url = full_url.rstrip("/")
