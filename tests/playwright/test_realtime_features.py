@@ -1,10 +1,11 @@
+# -*- coding: utf-8 -*-
 import json
 import pytest
 from playwright.sync_api import Page, expect
 
 class TestRealtimeFeatures:
     """Real-time WebSocket and SSE feature tests for MCP Gateway Admin UI.
-    
+
     Examples:
         pytest tests/playwright/test_realtime_features.py
     """

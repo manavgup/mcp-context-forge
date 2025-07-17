@@ -1,10 +1,11 @@
+# -*- coding: utf-8 -*-
 import re
 import pytest
 from playwright.sync_api import Page, expect
 
 class TestHTMXInteractions:
     """HTMX and UI interaction tests for MCP Gateway Admin UI.
-    
+
     Examples:
         pytest tests/playwright/test_htmx_interactions.py
     """

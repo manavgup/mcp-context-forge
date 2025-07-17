@@ -1,9 +1,10 @@
+# -*- coding: utf-8 -*-
 import pytest
 from playwright.sync_api import Page, expect, APIRequestContext
 
 class TestAPIIntegration:
     """API integration tests for MCP protocol and REST endpoints.
-    
+
     Examples:
         pytest tests/playwright/test_api_integration.py
     """
@@ -32,7 +33,7 @@ class TestAPIIntegration:
         cookies = page.context.cookies()
         jwt_cookie = next((c for c in cookies if c["name"] == "jwt_token"), None)
         assert jwt_cookie is not None
-        response = request.post("/api/mcp/initialize", 
+        response = request.post("/api/mcp/initialize",
             headers={"Cookie": f"jwt_token={jwt_cookie['value']}"},
             data={
                 "jsonrpc": "2.0",

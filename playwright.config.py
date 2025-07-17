@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 from playwright.sync_api import Playwright
 
@@ -12,4 +13,4 @@ def pytest_playwright_setup(playwright: Playwright):
         "screenshot": "only-on-failure",
         "video": "retain-on-failure",
         "trace": "retain-on-failure",
-    } 
+    }

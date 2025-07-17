@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import re
 import pytest
@@ -9,9 +10,9 @@ BASIC_AUTH_PASSWORD = os.getenv("BASIC_AUTH_PASSWORD", "changeme")
 
 class TestAuthentication:
     """Authentication tests for MCP Gateway Admin UI.
-    
+
     Tests HTTP Basic Auth authentication flow for the admin interface.
-    
+
     Examples:
         pytest tests/playwright/test_auth.py
     """
@@ -27,17 +28,17 @@ class TestAuthentication:
         # Go directly to admin - HTTP Basic Auth handles authentication
         page.goto(f"{BASE_URL}/admin")
         page.screenshot(path="debug_login_page.png")
-        
+
         # Verify we successfully accessed the admin page
         expect(page).to_have_url(re.compile(r".*admin"))
         expect(page.locator("h1")).to_contain_text("MCP Context Forge")
-        
+
         # Check for JWT cookie (optional with HTTP Basic Auth)
         cookies = page.context.cookies()
         jwt_cookie = next((c for c in cookies if c["name"] == "jwt_token"), None)
         if jwt_cookie:
             assert jwt_cookie["httpOnly"] is True
-        
+
         context.close()
 
     def test_should_reject_invalid_credentials(self, browser):
@@ -49,10 +50,10 @@ class TestAuthentication:
             }
         )
         page = context.new_page()
-        
+
         # Try to access admin with invalid credentials
         response = page.goto(f"{BASE_URL}/admin")
-        
+
         # Should get 401 Unauthorized
         assert response.status == 401
         context.close()
@@ -61,10 +62,10 @@ class TestAuthentication:
         """Test that admin requires authentication."""
         context = browser.new_context()  # No credentials provided
         page = context.new_page()
-        
+
         # Try to access admin without credentials
         response = page.goto(f"{BASE_URL}/admin")
-        
+
         # Should get 401 Unauthorized
         assert response.status == 401
         context.close()
@@ -78,17 +79,17 @@ class TestAuthentication:
             }
         )
         page = context.new_page()
-        
+
         # Access admin page
         page.goto(f"{BASE_URL}/admin")
-        
+
         # Verify admin interface elements are present
         expect(page).to_have_url(re.compile(r".*admin"))
         expect(page.locator("h1")).to_contain_text("MCP Context Forge")
-        
+
         # Check that we can see admin tabs
         expect(page.locator('[data-testid="servers-tab"]')).to_be_visible()
         expect(page.locator('[data-testid="tools-tab"]')).to_be_visible()
         expect(page.locator('[data-testid="gateways-tab"]')).to_be_visible()
-        
+
         context.close()
