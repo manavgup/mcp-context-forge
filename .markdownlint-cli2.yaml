@@ -1,11 +1,6 @@
 # .markdownlint-cli2.yaml
 # Configuration for markdownlint-cli2
 
-# Customize which files to lint
-globs:
-  - "**/*.md"
-  - "**/*.markdown"
-
 # Ignore certain paths
 ignores:
   - "node_modules/**"
