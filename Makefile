@@ -405,7 +405,7 @@ images:
 	@rm -f packages.dot classes.dot snakefood.dot || true
 
 # =============================================================================
-# 🔍 LINTING & STATIC ANALYSIS - FIXED IMPLEMENTATION
+# 🔍 LINTING & STATIC ANALYSIS
 # =============================================================================
 # help: 🔍 LINTING & STATIC ANALYSIS
 # help: TARGET=<path>        - Override default target (mcpgateway tests)
@@ -416,8 +416,6 @@ images:
 # help:   make lint-quick myfile.py    - Fast linters only (ruff, black, isort)
 # help:   make lint-fix myfile.py      - Auto-fix formatting issues
 # help:   make lint-changed            - Lint only git-changed files
-# help:
-# help: Available Linters:
 # help: lint                 - Run the full linting suite (see targets below)
 # help: black                - Reformat code with black
 # help: autoflake            - Remove unused imports / variables with autoflake
@@ -483,7 +481,7 @@ FILE_AWARE_LINTERS := isort black flake8 pylint mypy bandit pydocstyle \
 
 
 ## --------------------------------------------------------------------------- ##
-##  Master target with smart file/directory detection
+##  Main target with smart file/directory detection
 ## --------------------------------------------------------------------------- ##
 lint:
 	@# Handle multiple file arguments
@@ -645,21 +643,28 @@ pylint:                             ## 🐛  pylint checks
 	@echo "🐛 pylint $(TARGET)..." && $(VENV_DIR)/bin/pylint $(TARGET)
 
 markdownlint:					    ## 📖  Markdown linting
-	@# Install markdownlint if not present
-	@test -d "$(VENV_DIR)" || $(MAKE) venv
-	@if [ ! -f "$(VENV_DIR)/bin/markdownlint" ]; then \
-		echo "📦 Installing markdownlint..."; \
-		/bin/bash -c "source $(VENV_DIR)/bin/activate && pip install -q markdownlint-cli2"; \
+	@# Install markdownlint-cli2 if not present
+	@if ! command -v markdownlint-cli2 >/dev/null 2>&1; then \
+		echo "📦 Installing markdownlint-cli2..."; \
+		if command -v npm >/dev/null 2>&1; then \
+			npm install -g markdownlint-cli2; \
+		else \
+			echo "❌ npm not found. Please install Node.js/npm first."; \
+			echo "💡 Install with:"; \
+			echo "   • macOS: brew install node"; \
+			echo "   • Linux: sudo apt-get install nodejs npm"; \
+			exit 1; \
+		fi; \
 	fi
-	@if [ -f "$(TARGET)" ] && echo "$(TARGET)" | grep -qE '\.(md|markdown)$'; then \
+	@if [ -f "$(TARGET)" ] && echo "$(TARGET)" | grep -qE '\.(md|markdown)$$'; then \
 		echo "📖 markdownlint $(TARGET)..."; \
-		$(VENV_DIR)/bin/markdownlint-cli2 "$(TARGET)" || true; \
+		markdownlint-cli2 "$(TARGET)" || true; \
 	elif [ -d "$(TARGET)" ]; then \
 		echo "📖 markdownlint $(TARGET)..."; \
-		$(VENV_DIR)/bin/markdownlint-cli2 "$(TARGET)"/**/*.md 2>/dev/null || true; \
+		markdownlint-cli2 "$(TARGET)/**/*.md" || true; \
 	else \
 		echo "📖 markdownlint (default)..."; \
-		$(VENV_DIR)/bin/markdownlint-cli2 "**/*.md" 2>/dev/null || true; \
+		markdownlint-cli2 "**/*.md" || true; \
 	fi
 
 mypy:                               ## 🏷️  mypy type-checking
@@ -848,9 +853,9 @@ shell-lint-file:                    ## 🐚  Lint shell script
 # -----------------------------------------------------------------------------
 # 🔍 LINT CHANGED FILES (GIT INTEGRATION)
 # -----------------------------------------------------------------------------
-# help: lint-changed            - Lint only git-changed files
-# help: lint-staged             - Lint only git-staged files
-# help: lint-commit             - Lint files in specific commit (use COMMIT=hash)
+# help: lint-changed         - Lint only git-changed files
+# help: lint-staged          - Lint only git-staged files
+# help: lint-commit          - Lint files in specific commit (use COMMIT=hash)
 .PHONY: lint-changed lint-staged lint-commit
 
 lint-changed:							## 🔍 Lint only changed files (git)
@@ -909,8 +914,8 @@ lint-commit:							## 🔍 Lint files changed in commit
 # -----------------------------------------------------------------------------
 # 👁️ WATCH MODE - LINT ON FILE CHANGES
 # -----------------------------------------------------------------------------
-# help: lint-watch              - Watch files for changes and auto-lint
-# help: lint-watch-quick        - Watch files with quick linting only
+# help: lint-watch           - Watch files for changes and auto-lint
+# help: lint-watch-quick     - Watch files with quick linting only
 .PHONY: lint-watch lint-watch-quick install-watchdog
 
 install-watchdog:						## 📦 Install watchdog for file watching
@@ -946,9 +951,9 @@ lint-watch-quick: install-watchdog		## 👁️ Watch for changes and quick-lint
 # -----------------------------------------------------------------------------
 # 🚨 STRICT LINTING WITH ERROR THRESHOLDS
 # -----------------------------------------------------------------------------
-# help: lint-strict             - Lint with error threshold (fail on errors)
-# help: lint-count-errors       - Count and report linting errors
-# help: lint-report             - Generate detailed linting report
+# help: lint-strict          - Lint with error threshold (fail on errors)
+# help: lint-count-errors    - Count and report linting errors
+# help: lint-report          - Generate detailed linting report
 .PHONY: lint-strict lint-count-errors lint-report
 
 # Lint with error threshold
@@ -1016,9 +1021,9 @@ lint-report:							## 📋 Generate comprehensive linting report
 # -----------------------------------------------------------------------------
 # 🔧 PRE-COMMIT INTEGRATION
 # -----------------------------------------------------------------------------
-# help: lint-install-hooks      - Install git pre-commit hooks for linting
-# help: lint-pre-commit         - Run linting as pre-commit check
-# help: lint-pre-push           - Run linting as pre-push check
+# help: lint-install-hooks   - Install git pre-commit hooks for linting
+# help: lint-pre-commit      - Run linting as pre-commit check
+# help: lint-pre-push        - Run linting as pre-push check
 .PHONY: lint-install-hooks lint-pre-commit lint-pre-push
 
 # Install git hooks for linting
@@ -1135,8 +1140,8 @@ lint-md:								## 📝 Lint only Markdown files
 # -----------------------------------------------------------------------------
 # 🚀 PERFORMANCE OPTIMIZATION
 # -----------------------------------------------------------------------------
-# help: lint-parallel           - Run linters in parallel for speed
-# help: lint-cache-clear        - Clear linting caches
+# help: lint-parallel        - Run linters in parallel for speed
+# help: lint-cache-clear     - Clear linting caches
 .PHONY: lint-parallel lint-cache-clear
 
 # Parallel linting for better performance
@@ -1163,8 +1168,8 @@ lint-cache-clear:						## 🧹 Clear linting caches
 # -----------------------------------------------------------------------------
 # 📊 LINTING STATISTICS AND METRICS
 # -----------------------------------------------------------------------------
-# help: lint-stats              - Show linting statistics
-# help: lint-complexity         - Analyze code complexity
+# help: lint-stats           - Show linting statistics
+# help: lint-complexity      - Analyze code complexity
 .PHONY: lint-stats lint-complexity
 
 # Show linting statistics
