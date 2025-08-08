@@ -1713,6 +1713,7 @@ class GatewayCreate(BaseModel):
         auth_token (Optional[str]): Token for bearer authentication.
         auth_header_key (Optional[str]): Key for custom headers authentication.
         auth_header_value (Optional[str]): Value for custom headers authentication.
+        auth_headers (Optional[List[Dict[str, str]]]): List of custom headers for authentication.
         auth_value (Optional[str]): Alias for authentication value, used for better access post-validation.
     """
 
@@ -1732,6 +1733,7 @@ class GatewayCreate(BaseModel):
     auth_token: Optional[str] = Field(None, description="Token for bearer authentication")
     auth_header_key: Optional[str] = Field(None, description="Key for custom headers authentication")
     auth_header_value: Optional[str] = Field(None, description="Value for custom headers authentication")
+    auth_headers: Optional[List[Dict[str, str]]] = Field(None, description="List of custom headers for authentication")
 
     # Adding `auth_value` as an alias for better access post-validation
     auth_value: Optional[str] = Field(None, validate_default=True)
@@ -1816,9 +1818,21 @@ class GatewayCreate(BaseModel):
         if (auth_type is None) or (auth_type == ""):
             return v  # If no auth_type is provided, no need to create auth_value
 
-        # Process the auth fields and generate auth_value based on auth_type
-        auth_value = cls._process_auth_fields(info)
+        # If custom headers, use all headers
+        if auth_type == "authheaders":
+            auth_headers = data.get("auth_headers")
+            if auth_headers and isinstance(auth_headers, list):
+                # Convert list of {key, value} to dict
+                header_dict = {h["key"]: h["value"] for h in auth_headers if h.get("key")}
+                return encode_auth(header_dict)
+            # Fallback to old single key/value
+            header_key = data.get("auth_header_key")
+            header_value = data.get("auth_header_value")
+            if header_key and header_value:
+                return encode_auth({header_key: header_value})
 
+        # Otherwise, use the default logic
+        auth_value = cls._process_auth_fields(info)
         return auth_value
 
     @field_validator("transport")
@@ -1909,6 +1923,7 @@ class GatewayUpdate(BaseModelWithConfigDict):
     transport: str = Field(default="SSE", description="Transport used by MCP server: SSE or STREAMABLEHTTP")
 
     passthrough_headers: Optional[List[str]] = Field(default=None, description="List of headers allowed to be passed through from client to target")
+    
     # Authorizations
     auth_type: Optional[str] = Field(None, description="auth_type: basic, bearer, headers or None")
     auth_username: Optional[str] = Field(None, description="username for basic authentication")
@@ -1916,6 +1931,7 @@ class GatewayUpdate(BaseModelWithConfigDict):
     auth_token: Optional[str] = Field(None, description="token for bearer authentication")
     auth_header_key: Optional[str] = Field(None, description="key for custom headers authentication")
     auth_header_value: Optional[str] = Field(None, description="value for custom headers authentication")
+    auth_headers: Optional[List[Dict[str, str]]] = Field(None, description="List of custom headers for authentication")
 
     # Adding `auth_value` as an alias for better access post-validation
     auth_value: Optional[str] = Field(None, validate_default=True)
@@ -2002,9 +2018,18 @@ class GatewayUpdate(BaseModelWithConfigDict):
         if (auth_type is None) or (auth_type == ""):
             return v  # If no auth_type is provided, no need to create auth_value
 
-        # Process the auth fields and generate auth_value based on auth_type
-        auth_value = cls._process_auth_fields(info)
+        # If custom headers, use all headers
+        if auth_type == "authheaders":
+            auth_headers = data.get("auth_headers")
+            if auth_headers and isinstance(auth_headers, list):
+                header_dict = {h["key"]: h["value"] for h in auth_headers if h.get("key")}
+                return encode_auth(header_dict)
+            header_key = data.get("auth_header_key")
+            header_value = data.get("auth_header_value")
+            if header_key and header_value:
+                return encode_auth({header_key: header_value})
 
+        auth_value = cls._process_auth_fields(info)
         return auth_value
 
     @staticmethod
@@ -2196,9 +2221,9 @@ class GatewayRead(BaseModelWithConfigDict):
             values.auth_token = auth.removeprefix("Bearer ")
 
         elif auth_type == "authheaders":
-            # must be exactly one header
-            if len(auth_value) != 1:
-                raise ValueError("authheaders requires exactly one key/value pair")
+            # For backward compatibility, populate first header in key/value fields
+            if len(auth_value) == 0:
+                raise ValueError("authheaders requires at least one key/value pair")
             k, v = next(iter(auth_value.items()))
             values.auth_header_key, values.auth_header_value = k, v
 
