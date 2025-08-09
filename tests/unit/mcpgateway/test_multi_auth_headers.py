@@ -48,7 +48,7 @@ class TestMultiAuthHeaders:
                 auth_headers=[]
             )
         
-        assert "at least one header must be provided" in str(exc_info.value).lower()
+        assert "either 'auth_headers' list or both" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
     async def test_gateway_create_with_duplicate_header_keys(self):
