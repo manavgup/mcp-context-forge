@@ -2,7 +2,6 @@
 """Test multi-header authentication functionality."""
 
 # Standard
-import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 # Third-Party
@@ -12,9 +11,9 @@ import pytest
 from starlette.datastructures import FormData
 
 # First-Party
-from mcpgateway.admin import admin_add_gateway, admin_edit_gateway
+from mcpgateway.admin import admin_add_gateway
 from mcpgateway.schemas import GatewayCreate, GatewayUpdate
-from mcpgateway.utils.services_auth import decode_auth, encode_auth
+from mcpgateway.utils.services_auth import decode_auth
 
 
 class TestMultiAuthHeaders:
@@ -23,18 +22,9 @@ class TestMultiAuthHeaders:
     @pytest.mark.asyncio
     async def test_gateway_create_with_valid_multi_headers(self):
         """Test creating gateway with valid multi-auth headers."""
-        auth_headers = [
-            {"key": "X-API-Key", "value": "secret123"},
-            {"key": "X-Client-ID", "value": "client456"},
-            {"key": "X-Region", "value": "us-east-1"}
-        ]
+        auth_headers = [{"key": "X-API-Key", "value": "secret123"}, {"key": "X-Client-ID", "value": "client456"}, {"key": "X-Region", "value": "us-east-1"}]
 
-        gateway = GatewayCreate(
-            name="Test Gateway",
-            url="http://example.com",
-            auth_type="authheaders",
-            auth_headers=auth_headers
-        )
+        gateway = GatewayCreate(name="Test Gateway", url="http://example.com", auth_type="authheaders", auth_headers=auth_headers)
 
         assert gateway.auth_value is not None
         decoded = decode_auth(gateway.auth_value)
@@ -46,30 +36,16 @@ class TestMultiAuthHeaders:
     async def test_gateway_create_with_empty_headers_list(self):
         """Test creating gateway with empty auth_headers list."""
         with pytest.raises(ValidationError) as exc_info:
-            GatewayCreate(
-                name="Test Gateway",
-                url="http://example.com",
-                auth_type="authheaders",
-                auth_headers=[]
-            )
+            GatewayCreate(name="Test Gateway", url="http://example.com", auth_type="authheaders", auth_headers=[])
 
         assert "either 'auth_headers' list or both" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
     async def test_gateway_create_with_duplicate_header_keys(self):
         """Test handling of duplicate header keys (last value wins)."""
-        auth_headers = [
-            {"key": "X-API-Key", "value": "first_value"},
-            {"key": "X-API-Key", "value": "second_value"},
-            {"key": "X-Client-ID", "value": "client123"}
-        ]
+        auth_headers = [{"key": "X-API-Key", "value": "first_value"}, {"key": "X-API-Key", "value": "second_value"}, {"key": "X-Client-ID", "value": "client123"}]
 
-        gateway = GatewayCreate(
-            name="Test Gateway",
-            url="http://example.com",
-            auth_type="authheaders",
-            auth_headers=auth_headers
-        )
+        gateway = GatewayCreate(name="Test Gateway", url="http://example.com", auth_type="authheaders", auth_headers=auth_headers)
 
         decoded = decode_auth(gateway.auth_value)
         assert decoded["X-API-Key"] == "second_value"  # Last value should win
@@ -78,17 +54,9 @@ class TestMultiAuthHeaders:
     @pytest.mark.asyncio
     async def test_gateway_create_with_empty_header_values(self):
         """Test creating gateway with empty header values."""
-        auth_headers = [
-            {"key": "X-API-Key", "value": ""},
-            {"key": "X-Client-ID", "value": "client123"}
-        ]
+        auth_headers = [{"key": "X-API-Key", "value": ""}, {"key": "X-Client-ID", "value": "client123"}]
 
-        gateway = GatewayCreate(
-            name="Test Gateway",
-            url="http://example.com",
-            auth_type="authheaders",
-            auth_headers=auth_headers
-        )
+        gateway = GatewayCreate(name="Test Gateway", url="http://example.com", auth_type="authheaders", auth_headers=auth_headers)
 
         decoded = decode_auth(gateway.auth_value)
         assert decoded["X-API-Key"] == ""  # Empty values should be allowed
@@ -97,17 +65,9 @@ class TestMultiAuthHeaders:
     @pytest.mark.asyncio
     async def test_gateway_create_with_missing_key_in_header(self):
         """Test creating gateway with missing key in header object."""
-        auth_headers = [
-            {"value": "secret123"},  # Missing 'key' field
-            {"key": "X-Client-ID", "value": "client123"}
-        ]
+        auth_headers = [{"value": "secret123"}, {"key": "X-Client-ID", "value": "client123"}]  # Missing 'key' field
 
-        gateway = GatewayCreate(
-            name="Test Gateway",
-            url="http://example.com",
-            auth_type="authheaders",
-            auth_headers=auth_headers
-        )
+        gateway = GatewayCreate(name="Test Gateway", url="http://example.com", auth_type="authheaders", auth_headers=auth_headers)
 
         decoded = decode_auth(gateway.auth_value)
         assert "X-Client-ID" in decoded
@@ -116,13 +76,7 @@ class TestMultiAuthHeaders:
     @pytest.mark.asyncio
     async def test_backward_compatibility_single_headers(self):
         """Test backward compatibility with single header fields."""
-        gateway = GatewayCreate(
-            name="Test Gateway",
-            url="http://example.com",
-            auth_type="authheaders",
-            auth_header_key="X-API-Key",
-            auth_header_value="secret123"
-        )
+        gateway = GatewayCreate(name="Test Gateway", url="http://example.com", auth_type="authheaders", auth_header_key="X-API-Key", auth_header_value="secret123")
 
         decoded = decode_auth(gateway.auth_value)
         assert decoded["X-API-Key"] == "secret123"
@@ -130,9 +84,7 @@ class TestMultiAuthHeaders:
     @pytest.mark.asyncio
     async def test_multi_headers_priority_over_single(self):
         """Test that multi-headers take priority over single header fields."""
-        auth_headers = [
-            {"key": "X-Multi-Header", "value": "multi_value"}
-        ]
+        auth_headers = [{"key": "X-Multi-Header", "value": "multi_value"}]
 
         gateway = GatewayCreate(
             name="Test Gateway",
@@ -140,7 +92,7 @@ class TestMultiAuthHeaders:
             auth_type="authheaders",
             auth_headers=auth_headers,
             auth_header_key="X-Single-Header",  # Should be ignored
-            auth_header_value="single_value"    # Should be ignored
+            auth_header_value="single_value",  # Should be ignored
         )
 
         decoded = decode_auth(gateway.auth_value)
@@ -150,14 +102,9 @@ class TestMultiAuthHeaders:
     @pytest.mark.asyncio
     async def test_gateway_update_add_multi_headers(self):
         """Test updating gateway to add multi-headers."""
-        auth_headers = [
-            {"key": "X-New-Header", "value": "new_value"}
-        ]
+        auth_headers = [{"key": "X-New-Header", "value": "new_value"}]
 
-        gateway = GatewayUpdate(
-            auth_type="authheaders",
-            auth_headers=auth_headers
-        )
+        gateway = GatewayUpdate(auth_type="authheaders", auth_headers=auth_headers)
 
         assert gateway.auth_value is not None
         decoded = decode_auth(gateway.auth_value)
@@ -166,17 +113,9 @@ class TestMultiAuthHeaders:
     @pytest.mark.asyncio
     async def test_special_characters_in_headers(self):
         """Test headers with special characters."""
-        auth_headers = [
-            {"key": "X-Special-!@#", "value": "value-with-特殊字符"},
-            {"key": "Content-Type", "value": "application/json; charset=utf-8"}
-        ]
+        auth_headers = [{"key": "X-Special-!@#", "value": "value-with-特殊字符"}, {"key": "Content-Type", "value": "application/json; charset=utf-8"}]
 
-        gateway = GatewayCreate(
-            name="Test Gateway",
-            url="http://example.com",
-            auth_type="authheaders",
-            auth_headers=auth_headers
-        )
+        gateway = GatewayCreate(name="Test Gateway", url="http://example.com", auth_type="authheaders", auth_headers=auth_headers)
 
         decoded = decode_auth(gateway.auth_value)
         assert decoded["X-Special-!@#"] == "value-with-特殊字符"
@@ -185,18 +124,9 @@ class TestMultiAuthHeaders:
     @pytest.mark.asyncio
     async def test_case_sensitivity_preservation(self):
         """Test that header key case is preserved."""
-        auth_headers = [
-            {"key": "X-API-Key", "value": "value1"},
-            {"key": "x-api-key", "value": "value2"},
-            {"key": "X-Api-Key", "value": "value3"}
-        ]
+        auth_headers = [{"key": "X-API-Key", "value": "value1"}, {"key": "x-api-key", "value": "value2"}, {"key": "X-Api-Key", "value": "value3"}]
 
-        gateway = GatewayCreate(
-            name="Test Gateway",
-            url="http://example.com",
-            auth_type="authheaders",
-            auth_headers=auth_headers
-        )
+        gateway = GatewayCreate(name="Test Gateway", url="http://example.com", auth_type="authheaders", auth_headers=auth_headers)
 
         decoded = decode_auth(gateway.auth_value)
         # All three variations should be preserved as separate keys
@@ -208,12 +138,7 @@ class TestMultiAuthHeaders:
         mock_db = MagicMock()
         mock_user = "test_user"
 
-        form_data = FormData([
-            ("name", "Test Gateway"),
-            ("url", "http://example.com"),
-            ("auth_type", "authheaders"),
-            ("auth_headers", "{invalid json}")
-        ])
+        form_data = FormData([("name", "Test Gateway"), ("url", "http://example.com"), ("auth_type", "authheaders"), ("auth_headers", "{invalid json}")])
 
         mock_request = MagicMock(spec=Request)
         mock_request.form = AsyncMock(return_value=form_data)
@@ -226,17 +151,9 @@ class TestMultiAuthHeaders:
     @pytest.mark.asyncio
     async def test_large_number_of_headers(self):
         """Test handling of large number of headers."""
-        auth_headers = [
-            {"key": f"X-Header-{i}", "value": f"value-{i}"}
-            for i in range(100)
-        ]
+        auth_headers = [{"key": f"X-Header-{i}", "value": f"value-{i}"} for i in range(100)]
 
-        gateway = GatewayCreate(
-            name="Test Gateway",
-            url="http://example.com",
-            auth_type="authheaders",
-            auth_headers=auth_headers
-        )
+        gateway = GatewayCreate(name="Test Gateway", url="http://example.com", auth_type="authheaders", auth_headers=auth_headers)
 
         decoded = decode_auth(gateway.auth_value)
         assert len(decoded) == 100
@@ -245,17 +162,9 @@ class TestMultiAuthHeaders:
     @pytest.mark.asyncio
     async def test_authorization_header_in_multi_headers(self):
         """Test including Authorization header in multi-headers."""
-        auth_headers = [
-            {"key": "Authorization", "value": "Bearer token123"},
-            {"key": "X-API-Key", "value": "secret"}
-        ]
+        auth_headers = [{"key": "Authorization", "value": "Bearer token123"}, {"key": "X-API-Key", "value": "secret"}]
 
-        gateway = GatewayCreate(
-            name="Test Gateway",
-            url="http://example.com",
-            auth_type="authheaders",
-            auth_headers=auth_headers
-        )
+        gateway = GatewayCreate(name="Test Gateway", url="http://example.com", auth_type="authheaders", auth_headers=auth_headers)
 
         decoded = decode_auth(gateway.auth_value)
         assert decoded["Authorization"] == "Bearer token123"

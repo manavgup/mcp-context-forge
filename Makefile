@@ -41,7 +41,8 @@ FILES_TO_CLEAN := .coverage coverage.xml mcp.prof mcp.pstats \
 	*.db *.sqlite *.sqlite3 mcp.db-journal *.py,cover \
 	.depsorter_cache.json .depupdate.* \
 	grype-results.sarif devskim-results.sarif \
-	*.tar.gz *.tar.bz2 *.tar.xz *.zip *.deb
+	*.tar.gz *.tar.bz2 *.tar.xz *.zip *.deb \
+	*.log mcpgateway.sbom.xml
 
 COVERAGE_DIR ?= $(DOCS_DIR)/docs/coverage
 LICENSES_MD  ?= $(DOCS_DIR)/docs/test/licenses.md
@@ -405,19 +406,17 @@ images:
 	@rm -f packages.dot classes.dot snakefood.dot || true
 
 # =============================================================================
-# 🔍 LINTING & STATIC ANALYSIS - FIXED IMPLEMENTATION
+# 🔍 LINTING & STATIC ANALYSIS
 # =============================================================================
 # help: 🔍 LINTING & STATIC ANALYSIS
-# help: TARGET=<path>        - Override default target (mcpgateway tests)
+# help: TARGET=<path>        - Override default target (mcpgateway)
 # help: Usage Examples:
-# help:   make lint                    - Run all linters on default targets (mcpgateway tests)
+# help:   make lint                    - Run all linters on default targets (mcpgateway)
 # help:   make lint TARGET=myfile.py   - Run file-aware linters on specific file
 # help:   make lint myfile.py          - Run file-aware linters on a file (shortcut)
 # help:   make lint-quick myfile.py    - Fast linters only (ruff, black, isort)
 # help:   make lint-fix myfile.py      - Auto-fix formatting issues
 # help:   make lint-changed            - Lint only git-changed files
-# help:
-# help: Available Linters:
 # help: lint                 - Run the full linting suite (see targets below)
 # help: black                - Reformat code with black
 # help: autoflake            - Remove unused imports / variables with autoflake
@@ -453,7 +452,7 @@ images:
 # help: vulture              - Dead code detection
 
 # Allow specific file/directory targeting
-DEFAULT_TARGETS := mcpgateway tests
+DEFAULT_TARGETS := mcpgateway
 TARGET ?= $(DEFAULT_TARGETS)
 
 # Add dummy targets for file arguments passed to lint commands only
@@ -483,7 +482,7 @@ FILE_AWARE_LINTERS := isort black flake8 pylint mypy bandit pydocstyle \
 
 
 ## --------------------------------------------------------------------------- ##
-##  Master target with smart file/directory detection
+##  Main target with smart file/directory detection
 ## --------------------------------------------------------------------------- ##
 lint:
 	@# Handle multiple file arguments
@@ -645,21 +644,28 @@ pylint:                             ## 🐛  pylint checks
 	@echo "🐛 pylint $(TARGET)..." && $(VENV_DIR)/bin/pylint $(TARGET)
 
 markdownlint:					    ## 📖  Markdown linting
-	@# Install markdownlint if not present
-	@test -d "$(VENV_DIR)" || $(MAKE) venv
-	@if [ ! -f "$(VENV_DIR)/bin/markdownlint" ]; then \
-		echo "📦 Installing markdownlint..."; \
-		/bin/bash -c "source $(VENV_DIR)/bin/activate && pip install -q markdownlint-cli2"; \
+	@# Install markdownlint-cli2 if not present
+	@if ! command -v markdownlint-cli2 >/dev/null 2>&1; then \
+		echo "📦 Installing markdownlint-cli2..."; \
+		if command -v npm >/dev/null 2>&1; then \
+			npm install -g markdownlint-cli2; \
+		else \
+			echo "❌ npm not found. Please install Node.js/npm first."; \
+			echo "💡 Install with:"; \
+			echo "   • macOS: brew install node"; \
+			echo "   • Linux: sudo apt-get install nodejs npm"; \
+			exit 1; \
+		fi; \
 	fi
-	@if [ -f "$(TARGET)" ] && echo "$(TARGET)" | grep -qE '\.(md|markdown)$'; then \
+	@if [ -f "$(TARGET)" ] && echo "$(TARGET)" | grep -qE '\.(md|markdown)$$'; then \
 		echo "📖 markdownlint $(TARGET)..."; \
-		$(VENV_DIR)/bin/markdownlint-cli2 "$(TARGET)" || true; \
+		markdownlint-cli2 "$(TARGET)" || true; \
 	elif [ -d "$(TARGET)" ]; then \
 		echo "📖 markdownlint $(TARGET)..."; \
-		$(VENV_DIR)/bin/markdownlint-cli2 "$(TARGET)"/**/*.md 2>/dev/null || true; \
+		markdownlint-cli2 "$(TARGET)/**/*.md" || true; \
 	else \
 		echo "📖 markdownlint (default)..."; \
-		$(VENV_DIR)/bin/markdownlint-cli2 "**/*.md" 2>/dev/null || true; \
+		markdownlint-cli2 "**/*.md" || true; \
 	fi
 
 mypy:                               ## 🏷️  mypy type-checking
@@ -848,9 +854,9 @@ shell-lint-file:                    ## 🐚  Lint shell script
 # -----------------------------------------------------------------------------
 # 🔍 LINT CHANGED FILES (GIT INTEGRATION)
 # -----------------------------------------------------------------------------
-# help: lint-changed            - Lint only git-changed files
-# help: lint-staged             - Lint only git-staged files
-# help: lint-commit             - Lint files in specific commit (use COMMIT=hash)
+# help: lint-changed         - Lint only git-changed files
+# help: lint-staged          - Lint only git-staged files
+# help: lint-commit          - Lint files in specific commit (use COMMIT=hash)
 .PHONY: lint-changed lint-staged lint-commit
 
 lint-changed:							## 🔍 Lint only changed files (git)
@@ -909,8 +915,8 @@ lint-commit:							## 🔍 Lint files changed in commit
 # -----------------------------------------------------------------------------
 # 👁️ WATCH MODE - LINT ON FILE CHANGES
 # -----------------------------------------------------------------------------
-# help: lint-watch              - Watch files for changes and auto-lint
-# help: lint-watch-quick        - Watch files with quick linting only
+# help: lint-watch           - Watch files for changes and auto-lint
+# help: lint-watch-quick     - Watch files with quick linting only
 .PHONY: lint-watch lint-watch-quick install-watchdog
 
 install-watchdog:						## 📦 Install watchdog for file watching
@@ -946,9 +952,9 @@ lint-watch-quick: install-watchdog		## 👁️ Watch for changes and quick-lint
 # -----------------------------------------------------------------------------
 # 🚨 STRICT LINTING WITH ERROR THRESHOLDS
 # -----------------------------------------------------------------------------
-# help: lint-strict             - Lint with error threshold (fail on errors)
-# help: lint-count-errors       - Count and report linting errors
-# help: lint-report             - Generate detailed linting report
+# help: lint-strict          - Lint with error threshold (fail on errors)
+# help: lint-count-errors    - Count and report linting errors
+# help: lint-report          - Generate detailed linting report
 .PHONY: lint-strict lint-count-errors lint-report
 
 # Lint with error threshold
@@ -1016,9 +1022,9 @@ lint-report:							## 📋 Generate comprehensive linting report
 # -----------------------------------------------------------------------------
 # 🔧 PRE-COMMIT INTEGRATION
 # -----------------------------------------------------------------------------
-# help: lint-install-hooks      - Install git pre-commit hooks for linting
-# help: lint-pre-commit         - Run linting as pre-commit check
-# help: lint-pre-push           - Run linting as pre-push check
+# help: lint-install-hooks   - Install git pre-commit hooks for linting
+# help: lint-pre-commit      - Run linting as pre-commit check
+# help: lint-pre-push        - Run linting as pre-push check
 .PHONY: lint-install-hooks lint-pre-commit lint-pre-push
 
 # Install git hooks for linting
@@ -1135,8 +1141,8 @@ lint-md:								## 📝 Lint only Markdown files
 # -----------------------------------------------------------------------------
 # 🚀 PERFORMANCE OPTIMIZATION
 # -----------------------------------------------------------------------------
-# help: lint-parallel           - Run linters in parallel for speed
-# help: lint-cache-clear        - Clear linting caches
+# help: lint-parallel        - Run linters in parallel for speed
+# help: lint-cache-clear     - Clear linting caches
 .PHONY: lint-parallel lint-cache-clear
 
 # Parallel linting for better performance
@@ -1163,8 +1169,8 @@ lint-cache-clear:						## 🧹 Clear linting caches
 # -----------------------------------------------------------------------------
 # 📊 LINTING STATISTICS AND METRICS
 # -----------------------------------------------------------------------------
-# help: lint-stats              - Show linting statistics
-# help: lint-complexity         - Analyze code complexity
+# help: lint-stats           - Show linting statistics
+# help: lint-complexity      - Analyze code complexity
 .PHONY: lint-stats lint-complexity
 
 # Show linting statistics
@@ -1407,8 +1413,8 @@ osv-scan: osv-scan-source osv-scan-image
 # help: sonar-deps-docker    - Install docker-compose + supporting tools
 # help: sonar-up-podman      - Launch SonarQube with podman-compose
 # help: sonar-up-docker      - Launch SonarQube with docker-compose
-# help: sonar-submit-docker  - Run containerised Sonar Scanner CLI with Docker
-# help: sonar-submit-podman  - Run containerised Sonar Scanner CLI with Podman
+# help: sonar-submit-docker  - Run containerized Sonar Scanner CLI with Docker
+# help: sonar-submit-podman  - Run containerized Sonar Scanner CLI with Podman
 # help: pysonar-scanner      - Run scan with Python wrapper (pysonar-scanner)
 # help: sonar-info           - How to create a token & which env vars to export
 
@@ -1454,9 +1460,9 @@ sonar-up-docker:
 	@sleep 30 && $(COMPOSE_CMD) ps | grep sonarqube || \
 	  echo "⚠️  Server may still be starting."
 
-## ─────────── Containerised Scanner CLI (Docker / Podman) ───────────────
+## ─────────── Containerized Scanner CLI (Docker / Podman) ───────────────
 sonar-submit-docker:
-	@echo "📡 Scanning code with containerised Sonar Scanner CLI (Docker) ..."
+	@echo "📡 Scanning code with containerized Sonar Scanner CLI (Docker) ..."
 	docker run --rm \
 		-e SONAR_HOST_URL="$(SONAR_HOST_URL)" \
 		$(if $(SONAR_TOKEN),-e SONAR_TOKEN="$(SONAR_TOKEN)",) \
@@ -1465,7 +1471,7 @@ sonar-submit-docker:
 		-Dproject.settings=$(SONAR_PROPS)
 
 sonar-submit-podman:
-	@echo "📡 Scanning code with containerised Sonar Scanner CLI (Podman) ..."
+	@echo "📡 Scanning code with containerized Sonar Scanner CLI (Podman) ..."
 	podman run --rm \
 		--network $(SONAR_NETWORK) \
 		-e SONAR_HOST_URL="$(SONAR_HOST_URL)" \
@@ -1789,6 +1795,7 @@ container-build:
 		--tag $(IMAGE_BASE):$(IMAGE_TAG) \
 		.
 	@echo "✅ Built image: $(call get_image_name)"
+	$(CONTAINER_RUNTIME) images $(IMAGE_BASE):$(IMAGE_TAG)
 
 container-run: container-check-image
 	@echo "🚀 Running with $(CONTAINER_RUNTIME)..."
@@ -1833,7 +1840,6 @@ container-run-ssl: certs container-check-image
 	-$(CONTAINER_RUNTIME) stop $(PROJECT_NAME) 2>/dev/null || true
 	-$(CONTAINER_RUNTIME) rm $(PROJECT_NAME) 2>/dev/null || true
 	$(CONTAINER_RUNTIME) run --name $(PROJECT_NAME) \
-		-u $(id -u):$(id -g) \
 		--env-file=.env \
 		-e SSL=true \
 		-e CERT_FILE=certs/cert.pem \
@@ -1854,7 +1860,6 @@ container-run-ssl-host: certs container-check-image
 	-$(CONTAINER_RUNTIME) stop $(PROJECT_NAME) 2>/dev/null || true
 	-$(CONTAINER_RUNTIME) rm $(PROJECT_NAME) 2>/dev/null || true
 	$(CONTAINER_RUNTIME) run --name $(PROJECT_NAME) \
-		-u $(id -u):$(id -g) \
 		--network=host \
 		--env-file=.env \
 		-e SSL=true \
@@ -1869,9 +1874,6 @@ container-run-ssl-host: certs container-check-image
 		-d $(call get_image_name)
 	@sleep 2
 	@echo "✅ Container started with TLS (host networking)"
-
-
-
 
 container-push: container-check-image
 	@echo "📤 Preparing to push image..."
@@ -2587,7 +2589,7 @@ MINIKUBE_ADDONS  ?= ingress ingress-dns metrics-server dashboard registry regist
 # OCI image tag to preload into the cluster.
 # - By default we point to the *local* image built via `make docker-prod`, e.g.
 #   mcpgateway/mcpgateway:latest.  Override with IMAGE=<repo:tag> to use a
-#   remote registry (e.g. ghcr.io/ibm/mcp-context-forge:v0.4.0).
+#   remote registry (e.g. ghcr.io/ibm/mcp-context-forge:v0.5.0).
 TAG              ?= latest         # override with TAG=<ver>
 IMAGE            ?= $(IMG):$(TAG)  # or IMAGE=ghcr.io/ibm/mcp-context-forge:$(TAG)
 
@@ -2603,7 +2605,7 @@ IMAGE            ?= $(IMG):$(TAG)  # or IMAGE=ghcr.io/ibm/mcp-context-forge:$(TA
 # help: minikube-port-forward   - Run kubectl port-forward -n mcp-private svc/mcp-stack-mcpgateway 8080:80
 # help: minikube-dashboard      - Print & (best-effort) open the Kubernetes dashboard URL
 # help: minikube-image-load     - Load $(IMAGE) into Minikube container runtime
-# help: minikube-k8s-apply      - Apply manifests from k8s/ - access with `kubectl port-forward svc/mcp-context-forge 8080:80`
+# help: minikube-k8s-apply      - Apply manifests from deployment/k8s/ - access with `kubectl port-forward svc/mcp-context-forge 8080:80`
 # help: minikube-status         - Cluster + addon health overview
 # help: minikube-context        - Switch kubectl context to Minikube
 # help: minikube-ssh            - SSH into the Minikube VM
@@ -2694,7 +2696,7 @@ minikube-image-load:
 
 minikube-k8s-apply:
 	@echo "🧩 Applying k8s manifests in ./k8s ..."
-	@kubectl apply -f k8s/ --recursive
+	@kubectl apply -f deployment/k8s/ --recursive
 
 # -----------------------------------------------------------------------------
 # 🔍  Utility: print the current registry URL (host-port) - works after cluster
@@ -3222,7 +3224,7 @@ devpi-unconfigure-pip:
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 📦  Version helper (defaults to the version in pyproject.toml)
-#      override on the CLI:  make VER=0.4.0 devpi-delete
+#      override on the CLI:  make VER=0.5.0 devpi-delete
 # ─────────────────────────────────────────────────────────────────────────────
 VER ?= $(shell python3 -c "import tomllib, pathlib; \
 print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])" \
@@ -3658,14 +3660,14 @@ semgrep:                            ## 🔍 Security patterns & anti-patterns
 	@test -d "$(VENV_DIR)" || $(MAKE) venv
 	@/bin/bash -c "source $(VENV_DIR)/bin/activate && \
 		python3 -m pip install -q semgrep && \
-		$(VENV_DIR)/bin/semgrep --config=auto mcpgateway tests --exclude-rule python.lang.compatibility.python37.python37-compatibility-importlib2 || true"
+		$(VENV_DIR)/bin/semgrep --config=auto $(TARGET) --exclude-rule python.lang.compatibility.python37.python37-compatibility-importlib2 || true"
 
 dodgy:                              ## 🔐 Suspicious code patterns
 	@echo "🔐  dodgy - scanning for hardcoded secrets..."
 	@test -d "$(VENV_DIR)" || $(MAKE) venv
 	@/bin/bash -c "source $(VENV_DIR)/bin/activate && \
 		python3 -m pip install -q dodgy && \
-		$(VENV_DIR)/bin/dodgy mcpgateway tests || true"
+		$(VENV_DIR)/bin/dodgy $(TARGET) || true"
 
 dlint:                              ## 📏 Python best practices
 	@echo "📏  dlint - checking Python best practices..."
@@ -3679,8 +3681,8 @@ pyupgrade:                          ## ⬆️  Upgrade Python syntax
 	@test -d "$(VENV_DIR)" || $(MAKE) venv
 	@/bin/bash -c "source $(VENV_DIR)/bin/activate && \
 		python3 -m pip install -q pyupgrade && \
-		find mcpgateway tests -name '*.py' -exec $(VENV_DIR)/bin/pyupgrade --py312-plus --diff {} + || true"
-	@echo "💡  To apply changes, run: find mcpgateway tests -name '*.py' -exec $(VENV_DIR)/bin/pyupgrade --py312-plus {} +"
+		find $(TARGET) -name '*.py' -exec $(VENV_DIR)/bin/pyupgrade --py312-plus --diff {} + || true"
+	@echo "💡  To apply changes, run: find $(TARGET) -name '*.py' -exec $(VENV_DIR)/bin/pyupgrade --py312-plus {} +"
 
 interrogate:                        ## 📝 Docstring coverage
 	@echo "📝  interrogate - checking docstring coverage..."
@@ -3802,12 +3804,12 @@ security-report:                    ## 📊 Generate comprehensive security repo
 	@echo "## Code Security Patterns (semgrep)" >> $(DOCS_DIR)/docs/security/report.md
 	@/bin/bash -c "source $(VENV_DIR)/bin/activate && \
 		python3 -m pip install -q semgrep && \
-		$(VENV_DIR)/bin/semgrep --config=auto mcpgateway tests --quiet || true" >> $(DOCS_DIR)/docs/security/report.md 2>&1
+		$(VENV_DIR)/bin/semgrep --config=auto $(TARGET) --quiet || true" >> $(DOCS_DIR)/docs/security/report.md 2>&1
 	@echo "" >> $(DOCS_DIR)/docs/security/report.md
 	@echo "## Suspicious Code Patterns (dodgy)" >> $(DOCS_DIR)/docs/security/report.md
 	@/bin/bash -c "source $(VENV_DIR)/bin/activate && \
 		python3 -m pip install -q dodgy && \
-		$(VENV_DIR)/bin/dodgy mcpgateway tests || true" >> $(DOCS_DIR)/docs/security/report.md 2>&1
+		$(VENV_DIR)/bin/dodgy $(TARGET) || true" >> $(DOCS_DIR)/docs/security/report.md 2>&1
 	@echo "" >> $(DOCS_DIR)/docs/security/report.md
 	@echo "## DevSkim Security Anti-patterns" >> $(DOCS_DIR)/docs/security/report.md
 	@if command -v devskim >/dev/null 2>&1 || [ -f "$$HOME/.dotnet/tools/devskim" ]; then \
@@ -3823,7 +3825,7 @@ security-fix:                       ## 🔧 Auto-fix security issues where possi
 	@echo "➤ Upgrading Python syntax with pyupgrade..."
 	@/bin/bash -c "source $(VENV_DIR)/bin/activate && \
 		python3 -m pip install -q pyupgrade && \
-		find mcpgateway tests -name '*.py' -exec $(VENV_DIR)/bin/pyupgrade --py312-plus {} +"
+		find $(TARGET) -name '*.py' -exec $(VENV_DIR)/bin/pyupgrade --py312-plus {} +"
 	@echo "➤ Updating dependencies to latest secure versions..."
 	@/bin/bash -c "source $(VENV_DIR)/bin/activate && \
 		python3 -m pip install --upgrade pip setuptools && \
@@ -4070,3 +4072,118 @@ snyk-helm-test:                     ## ⎈ Test Helm charts for security issues
 	else \
 		echo "⚠️  No Helm charts found in charts/mcp-stack/"; \
 	fi
+
+# ==============================================================================
+# 🔍 HEADER MANAGEMENT - Check and fix Python file headers
+# ==============================================================================
+# help: 🔍 HEADER MANAGEMENT - Check and fix Python file headers
+# help: check-headers          - Check all Python file headers (dry run - default)
+# help: check-headers-diff     - Check headers and show diff preview
+# help: check-headers-debug    - Check headers with debug information
+# help: check-header           - Check specific file/directory (use: path=...)
+# help: fix-all-headers        - Fix ALL files with incorrect headers (modifies files!)
+# help: fix-all-headers-no-encoding - Fix headers without encoding line requirement
+# help: fix-all-headers-custom - Fix with custom config (year=YYYY license=... shebang=...)
+# help: interactive-fix-headers - Fix headers with prompts before each change
+# help: fix-header             - Fix specific file/directory (use: path=... authors=...)
+# help: pre-commit-check-headers - Check headers for pre-commit hooks
+# help: pre-commit-fix-headers - Fix headers for pre-commit hooks
+
+.PHONY: check-headers fix-all-headers interactive-fix-headers fix-header check-headers-diff check-header \
+        check-headers-debug fix-all-headers-no-encoding fix-all-headers-custom \
+        pre-commit-check-headers pre-commit-fix-headers
+
+## --------------------------------------------------------------------------- ##
+##  Check modes (no modifications)
+## --------------------------------------------------------------------------- ##
+check-headers:                      ## 🔍 Check all Python file headers (dry run - default)
+	@echo "🔍 Checking Python file headers (dry run - no files will be modified)..."
+	@python3 .github/tools/fix_file_headers.py
+
+check-headers-diff:                 ## 🔍 Check headers and show diff preview
+	@echo "🔍 Checking Python file headers with diff preview..."
+	@python3 .github/tools/fix_file_headers.py --show-diff
+
+check-headers-debug:                ## 🔍 Check headers with debug information
+	@echo "🔍 Checking Python file headers with debug info..."
+	@python3 .github/tools/fix_file_headers.py --debug
+
+check-header:                       ## 🔍 Check specific file/directory (use: path=... debug=1 diff=1)
+	@if [ -z "$(path)" ]; then \
+		echo "❌ Error: 'path' parameter is required"; \
+		echo "💡 Usage: make check-header path=<file_or_directory> [debug=1] [diff=1]"; \
+		exit 1; \
+	fi
+	@echo "🔍 Checking headers in $(path) (dry run)..."
+	@extra_args=""; \
+	if [ "$(debug)" = "1" ]; then \
+		extra_args="$$extra_args --debug"; \
+	fi; \
+	if [ "$(diff)" = "1" ]; then \
+		extra_args="$$extra_args --show-diff"; \
+	fi; \
+	python3 .github/tools/fix_file_headers.py --check --path "$(path)" $$extra_args
+
+## --------------------------------------------------------------------------- ##
+##  Fix modes (will modify files)
+## --------------------------------------------------------------------------- ##
+fix-all-headers:                    ## 🔧 Fix ALL files with incorrect headers (⚠️ modifies files!)
+	@echo "⚠️  WARNING: This will modify all Python files with incorrect headers!"
+	@echo "🔧 Automatically fixing all Python file headers..."
+	@python3 .github/tools/fix_file_headers.py --fix-all
+
+fix-all-headers-no-encoding:        ## 🔧 Fix headers without encoding line requirement
+	@echo "🔧 Fixing headers without encoding line requirement..."
+	@python3 .github/tools/fix_file_headers.py --fix-all --no-encoding
+
+fix-all-headers-custom:             ## 🔧 Fix with custom config (year=YYYY license=... shebang=...)
+	@echo "🔧 Fixing headers with custom configuration..."
+	@if [ -n "$(year)" ]; then \
+		extra_args="$$extra_args --copyright-year $(year)"; \
+	fi; \
+	if [ -n "$(license)" ]; then \
+		extra_args="$$extra_args --license $(license)"; \
+	fi; \
+	if [ -n "$(shebang)" ]; then \
+		extra_args="$$extra_args --require-shebang $(shebang)"; \
+	fi; \
+	python3 .github/tools/fix_file_headers.py --fix-all $$extra_args
+
+interactive-fix-headers:            ## 💬 Fix headers with prompts before each change
+	@echo "💬 Interactively fixing Python file headers..."
+	@echo "You will be prompted before each change."
+	@python3 .github/tools/fix_file_headers.py --interactive
+
+fix-header:                         ## 🔧 Fix specific file/directory (use: path=... authors=... shebang=... encoding=no)
+	@if [ -z "$(path)" ]; then \
+		echo "❌ Error: 'path' parameter is required"; \
+		echo "💡 Usage: make fix-header path=<file_or_directory> [authors=\"Name1, Name2\"] [shebang=auto|always|never] [encoding=no]"; \
+		exit 1; \
+	fi
+	@echo "🔧 Fixing headers in $(path)"
+	@echo "⚠️  This will modify the file(s)!"
+	@extra_args=""; \
+	if [ -n "$(authors)" ]; then \
+		echo "   Authors: $(authors)"; \
+		extra_args="$$extra_args --authors \"$(authors)\""; \
+	fi; \
+	if [ -n "$(shebang)" ]; then \
+		echo "   Shebang requirement: $(shebang)"; \
+		extra_args="$$extra_args --require-shebang $(shebang)"; \
+	fi; \
+	if [ "$(encoding)" = "no" ]; then \
+		echo "   Encoding line: not required"; \
+		extra_args="$$extra_args --no-encoding"; \
+	fi; \
+	eval python3 .github/tools/fix_file_headers.py --fix --path "$(path)" $$extra_args
+
+## --------------------------------------------------------------------------- ##
+##  Pre-commit integration
+## --------------------------------------------------------------------------- ##
+pre-commit-check-headers:           ## 🪝 Check headers for pre-commit hooks
+	@echo "🪝 Checking headers for pre-commit..."
+	@python3 .github/tools/fix_file_headers.py --check
+
+pre-commit-fix-headers:             ## 🪝 Fix headers for pre-commit hooks
+	@echo "🪝 Fixing headers for pre-commit..."
+	@python3 .github/tools/fix_file_headers.py --fix-all

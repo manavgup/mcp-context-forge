@@ -2856,10 +2856,11 @@ function handleAuthTypeSelection(
         case "bearer":
             bearerFields.style.display = "block";
             break;
-        case "authheaders":
+        case "authheaders": {
             headersFields.style.display = "block";
             // Ensure at least one header row is present
-            const containerId = headersFields.querySelector('[id$="-container"]')?.id;
+            const containerId =
+                headersFields.querySelector('[id$="-container"]')?.id;
             if (containerId) {
                 const container = document.getElementById(containerId);
                 if (container && container.children.length === 0) {
@@ -2867,6 +2868,7 @@ function handleAuthTypeSelection(
                 }
             }
             break;
+        }
         default:
             // All fields already hidden
             break;
@@ -4669,7 +4671,10 @@ async function handleGatewayFormSubmit(e) {
                 if (Array.isArray(authHeaders) && authHeaders.length > 0) {
                     // Remove the JSON string and add as parsed data for backend processing
                     formData.delete("auth_headers");
-                    formData.append("auth_headers", JSON.stringify(authHeaders));
+                    formData.append(
+                        "auth_headers",
+                        JSON.stringify(authHeaders),
+                    );
                 }
             } catch (e) {
                 console.error("Invalid auth_headers JSON:", e);
@@ -6283,8 +6288,8 @@ function addAuthHeader(containerId) {
 
     const headerId = `auth-header-${++headerCounter}`;
 
-    const headerRow = document.createElement('div');
-    headerRow.className = 'flex items-center space-x-2';
+    const headerRow = document.createElement("div");
+    headerRow.className = "flex items-center space-x-2";
     headerRow.id = headerId;
 
     headerRow.innerHTML = `
@@ -6320,7 +6325,7 @@ function addAuthHeader(containerId) {
     updateAuthHeadersJSON(containerId);
 
     // Focus on the key input of the new header
-    const keyInput = headerRow.querySelector('.auth-header-key');
+    const keyInput = headerRow.querySelector(".auth-header-key");
     if (keyInput) {
         keyInput.focus();
     }
@@ -6355,9 +6360,9 @@ function updateAuthHeadersJSON(containerId) {
     const seenKeys = new Set();
     let hasValidationErrors = false;
 
-    headerRows.forEach(row => {
-        const keyInput = row.querySelector('.auth-header-key');
-        const valueInput = row.querySelector('.auth-header-value');
+    headerRows.forEach((row) => {
+        const keyInput = row.querySelector(".auth-header-key");
+        const valueInput = row.querySelector(".auth-header-value");
 
         if (keyInput && valueInput) {
             const key = keyInput.value.trim();
@@ -6370,7 +6375,7 @@ function updateAuthHeadersJSON(containerId) {
 
             // Require key but allow empty values
             if (!key) {
-                keyInput.setCustomValidity('Header key is required');
+                keyInput.setCustomValidity("Header key is required");
                 keyInput.reportValidity();
                 hasValidationErrors = true;
                 return;
@@ -6378,12 +6383,14 @@ function updateAuthHeadersJSON(containerId) {
 
             // Validate header key format (letters, numbers, hyphens, underscores)
             if (!/^[a-zA-Z0-9\-_]+$/.test(key)) {
-                keyInput.setCustomValidity('Header keys should contain only letters, numbers, hyphens, and underscores');
+                keyInput.setCustomValidity(
+                    "Header keys should contain only letters, numbers, hyphens, and underscores",
+                );
                 keyInput.reportValidity();
                 hasValidationErrors = true;
                 return;
             } else {
-                keyInput.setCustomValidity('');
+                keyInput.setCustomValidity("");
             }
 
             // Track duplicate keys
@@ -6393,37 +6400,40 @@ function updateAuthHeadersJSON(containerId) {
             seenKeys.add(key.toLowerCase());
 
             headers.push({
-                key: key,
-                value: value  // Allow empty values
+                key,
+                value, // Allow empty values
             });
         }
     });
 
     // Find the corresponding JSON input field
     let jsonInput = null;
-    if (containerId === 'auth-headers-container') {
-        jsonInput = document.getElementById('auth-headers-json');
-    } else if (containerId === 'auth-headers-container-gw') {
-        jsonInput = document.getElementById('auth-headers-json-gw');
-    } else if (containerId === 'edit-auth-headers-container') {
-        jsonInput = document.getElementById('edit-auth-headers-json');
-    } else if (containerId === 'auth-headers-container-gw-edit') {
-        jsonInput = document.getElementById('auth-headers-json-gw-edit');
+    if (containerId === "auth-headers-container") {
+        jsonInput = document.getElementById("auth-headers-json");
+    } else if (containerId === "auth-headers-container-gw") {
+        jsonInput = document.getElementById("auth-headers-json-gw");
+    } else if (containerId === "edit-auth-headers-container") {
+        jsonInput = document.getElementById("edit-auth-headers-json");
+    } else if (containerId === "auth-headers-container-gw-edit") {
+        jsonInput = document.getElementById("auth-headers-json-gw-edit");
     }
 
     // Warn about duplicate keys in console
     if (duplicateKeys.size > 0 && !hasValidationErrors) {
-        console.warn('Duplicate header keys detected (last value will be used):', Array.from(duplicateKeys));
+        console.warn(
+            "Duplicate header keys detected (last value will be used):",
+            Array.from(duplicateKeys),
+        );
     }
 
     // Check for excessive headers
     if (headers.length > 100) {
-        showNotification('Maximum of 100 headers allowed per gateway', 'error');
+        console.error("Maximum of 100 headers allowed per gateway");
         return;
     }
 
     if (jsonInput) {
-        jsonInput.value = headers.length > 0 ? JSON.stringify(headers) : '';
+        jsonInput.value = headers.length > 0 ? JSON.stringify(headers) : "";
     }
 }
 
@@ -6439,18 +6449,20 @@ function loadAuthHeaders(containerId, headers) {
     }
 
     // Clear existing headers
-    container.innerHTML = '';
+    container.innerHTML = "";
 
     // Add each header
-    headers.forEach(header => {
+    headers.forEach((header) => {
         if (header.key && header.value) {
             addAuthHeader(containerId);
             // Find the last added header row and populate it
-            const headerRows = container.querySelectorAll('[id^="auth-header-"]');
+            const headerRows = container.querySelectorAll(
+                '[id^="auth-header-"]',
+            );
             const lastRow = headerRows[headerRows.length - 1];
             if (lastRow) {
-                const keyInput = lastRow.querySelector('.auth-header-key');
-                const valueInput = lastRow.querySelector('.auth-header-value');
+                const keyInput = lastRow.querySelector(".auth-header-key");
+                const valueInput = lastRow.querySelector(".auth-header-value");
                 if (keyInput && valueInput) {
                     keyInput.value = header.key;
                     valueInput.value = header.value;

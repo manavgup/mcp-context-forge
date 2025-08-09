@@ -2102,7 +2102,7 @@ class GatewayUpdate(BaseModelWithConfigDict):
                         duplicate_keys.add(key)
 
                     # Validate header key format (basic HTTP header validation)
-                    if not all(c.isalnum() or c in '-_' for c in key.replace(' ', '')):
+                    if not all(c.isalnum() or c in "-_" for c in key.replace(" ", "")):
                         raise ValueError(f"Invalid header key format: '{key}'. Header keys should contain only alphanumeric characters, hyphens, and underscores.")
 
                     # Store header (empty values are allowed)
@@ -2116,6 +2116,7 @@ class GatewayUpdate(BaseModelWithConfigDict):
                 if duplicate_keys:
                     # Standard
                     import logging
+
                     logging.warning(f"Duplicate header keys detected (last value used): {', '.join(duplicate_keys)}")
 
                 # Check for excessive headers (prevent abuse)
