@@ -1907,15 +1907,15 @@ class GatewayCreate(BaseModel):
                 if not header_dict:
                     raise ValueError("For 'headers' auth, at least one header must be provided.")
                 return encode_auth(header_dict)
-            else:
-                # Legacy single header format (backward compatibility)
-                header_key = data.get("auth_header_key")
-                header_value = data.get("auth_header_value")
 
-                if not header_key or not header_value:
-                    raise ValueError("For 'headers' auth, either 'auth_headers' list or both 'auth_header_key' and 'auth_header_value' must be provided.")
+            # Legacy single header format (backward compatibility)
+            header_key = data.get("auth_header_key")
+            header_value = data.get("auth_header_value")
 
-                return encode_auth({header_key: header_value})
+            if not header_key or not header_value:
+                raise ValueError("For 'headers' auth, either 'auth_headers' list or both 'auth_header_key' and 'auth_header_value' must be provided.")
+
+            return encode_auth({header_key: header_value})
 
         raise ValueError("Invalid 'auth_type'. Must be one of: basic, bearer, or headers.")
 
@@ -2114,9 +2114,6 @@ class GatewayUpdate(BaseModelWithConfigDict):
 
                 # Warn about duplicate keys (optional - could log this instead)
                 if duplicate_keys:
-                    # Standard
-                    import logging
-
                     logging.warning(f"Duplicate header keys detected (last value used): {', '.join(duplicate_keys)}")
 
                 # Check for excessive headers (prevent abuse)
@@ -2124,15 +2121,15 @@ class GatewayUpdate(BaseModelWithConfigDict):
                     raise ValueError("Maximum of 100 headers allowed per gateway.")
 
                 return encode_auth(header_dict)
-            else:
-                # Legacy single header format (backward compatibility)
-                header_key = values.data.get("auth_header_key")
-                header_value = values.data.get("auth_header_value")
 
-                if not header_key or not header_value:
-                    raise ValueError("For 'headers' auth, either 'auth_headers' list or both 'auth_header_key' and 'auth_header_value' must be provided.")
+            # Legacy single header format (backward compatibility)
+            header_key = values.data.get("auth_header_key")
+            header_value = values.data.get("auth_header_value")
 
-                return encode_auth({header_key: header_value})
+            if not header_key or not header_value:
+                raise ValueError("For 'headers' auth, either 'auth_headers' list or both 'auth_header_key' and 'auth_header_value' must be provided.")
+
+            return encode_auth({header_key: header_value})
 
         raise ValueError("Invalid 'auth_type'. Must be one of: basic, bearer, or headers.")
 
