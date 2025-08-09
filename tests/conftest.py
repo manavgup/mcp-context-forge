@@ -53,8 +53,8 @@ def test_engine(test_db_url):
 @pytest.fixture
 def test_db(test_engine):
     """Create a fresh database session for a test."""
-    testing_session_local = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
-    db = testing_session_local()
+    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+    db = TestingSessionLocal()
     try:
         yield db
     finally:
@@ -131,9 +131,9 @@ def app_with_temp_db():
     import mcpgateway.db as db_mod
 
     engine = create_engine(url, connect_args={"check_same_thread": False}, poolclass=StaticPool)
-    test_session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     mp.setattr(db_mod, "engine", engine, raising=False)
-    mp.setattr(db_mod, "SessionLocal", test_session_local, raising=False)
+    mp.setattr(db_mod, "SessionLocal", TestSessionLocal, raising=False)
 
     # 4) patch the already‑imported main module **without reloading**
     # First-Party
