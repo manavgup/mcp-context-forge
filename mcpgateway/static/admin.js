@@ -6362,12 +6362,12 @@ function updateAuthHeadersJSON(containerId) {
         if (keyInput && valueInput) {
             const key = keyInput.value.trim();
             const value = valueInput.value.trim();
-            
+
             // Skip completely empty rows
             if (!key && !value) {
                 return;
             }
-            
+
             // Require key but allow empty values
             if (!key) {
                 keyInput.setCustomValidity('Header key is required');
@@ -6375,7 +6375,7 @@ function updateAuthHeadersJSON(containerId) {
                 hasValidationErrors = true;
                 return;
             }
-            
+
             // Validate header key format (letters, numbers, hyphens, underscores)
             if (!/^[a-zA-Z0-9\-_]+$/.test(key)) {
                 keyInput.setCustomValidity('Header keys should contain only letters, numbers, hyphens, and underscores');
@@ -6385,13 +6385,13 @@ function updateAuthHeadersJSON(containerId) {
             } else {
                 keyInput.setCustomValidity('');
             }
-            
+
             // Track duplicate keys
             if (seenKeys.has(key.toLowerCase())) {
                 duplicateKeys.add(key);
             }
             seenKeys.add(key.toLowerCase());
-            
+
             headers.push({
                 key: key,
                 value: value  // Allow empty values
@@ -6415,13 +6415,13 @@ function updateAuthHeadersJSON(containerId) {
     if (duplicateKeys.size > 0 && !hasValidationErrors) {
         console.warn('Duplicate header keys detected (last value will be used):', Array.from(duplicateKeys));
     }
-    
+
     // Check for excessive headers
     if (headers.length > 100) {
         showNotification('Maximum of 100 headers allowed per gateway', 'error');
         return;
     }
-    
+
     if (jsonInput) {
         jsonInput.value = headers.length > 0 ? JSON.stringify(headers) : '';
     }

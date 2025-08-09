@@ -1,15 +1,20 @@
+# -*- coding: utf-8 -*-
 """Test multi-header authentication functionality."""
 
+# Standard
 import json
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from fastapi import Request
-from starlette.datastructures import FormData
-from pydantic import ValidationError
 
+# Third-Party
+from fastapi import Request
+from pydantic import ValidationError
+import pytest
+from starlette.datastructures import FormData
+
+# First-Party
 from mcpgateway.admin import admin_add_gateway, admin_edit_gateway
 from mcpgateway.schemas import GatewayCreate, GatewayUpdate
-from mcpgateway.utils.services_auth import encode_auth, decode_auth
+from mcpgateway.utils.services_auth import decode_auth, encode_auth
 
 
 class TestMultiAuthHeaders:
@@ -23,14 +28,14 @@ class TestMultiAuthHeaders:
             {"key": "X-Client-ID", "value": "client456"},
             {"key": "X-Region", "value": "us-east-1"}
         ]
-        
+
         gateway = GatewayCreate(
             name="Test Gateway",
             url="http://example.com",
             auth_type="authheaders",
             auth_headers=auth_headers
         )
-        
+
         assert gateway.auth_value is not None
         decoded = decode_auth(gateway.auth_value)
         assert decoded["X-API-Key"] == "secret123"
@@ -47,7 +52,7 @@ class TestMultiAuthHeaders:
                 auth_type="authheaders",
                 auth_headers=[]
             )
-        
+
         assert "either 'auth_headers' list or both" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
@@ -58,14 +63,14 @@ class TestMultiAuthHeaders:
             {"key": "X-API-Key", "value": "second_value"},
             {"key": "X-Client-ID", "value": "client123"}
         ]
-        
+
         gateway = GatewayCreate(
             name="Test Gateway",
             url="http://example.com",
             auth_type="authheaders",
             auth_headers=auth_headers
         )
-        
+
         decoded = decode_auth(gateway.auth_value)
         assert decoded["X-API-Key"] == "second_value"  # Last value should win
         assert decoded["X-Client-ID"] == "client123"
@@ -77,14 +82,14 @@ class TestMultiAuthHeaders:
             {"key": "X-API-Key", "value": ""},
             {"key": "X-Client-ID", "value": "client123"}
         ]
-        
+
         gateway = GatewayCreate(
             name="Test Gateway",
             url="http://example.com",
             auth_type="authheaders",
             auth_headers=auth_headers
         )
-        
+
         decoded = decode_auth(gateway.auth_value)
         assert decoded["X-API-Key"] == ""  # Empty values should be allowed
         assert decoded["X-Client-ID"] == "client123"
@@ -96,14 +101,14 @@ class TestMultiAuthHeaders:
             {"value": "secret123"},  # Missing 'key' field
             {"key": "X-Client-ID", "value": "client123"}
         ]
-        
+
         gateway = GatewayCreate(
             name="Test Gateway",
             url="http://example.com",
             auth_type="authheaders",
             auth_headers=auth_headers
         )
-        
+
         decoded = decode_auth(gateway.auth_value)
         assert "X-Client-ID" in decoded
         assert len(decoded) == 1  # Only valid header should be included
@@ -118,7 +123,7 @@ class TestMultiAuthHeaders:
             auth_header_key="X-API-Key",
             auth_header_value="secret123"
         )
-        
+
         decoded = decode_auth(gateway.auth_value)
         assert decoded["X-API-Key"] == "secret123"
 
@@ -128,7 +133,7 @@ class TestMultiAuthHeaders:
         auth_headers = [
             {"key": "X-Multi-Header", "value": "multi_value"}
         ]
-        
+
         gateway = GatewayCreate(
             name="Test Gateway",
             url="http://example.com",
@@ -137,7 +142,7 @@ class TestMultiAuthHeaders:
             auth_header_key="X-Single-Header",  # Should be ignored
             auth_header_value="single_value"    # Should be ignored
         )
-        
+
         decoded = decode_auth(gateway.auth_value)
         assert "X-Multi-Header" in decoded
         assert "X-Single-Header" not in decoded
@@ -148,12 +153,12 @@ class TestMultiAuthHeaders:
         auth_headers = [
             {"key": "X-New-Header", "value": "new_value"}
         ]
-        
+
         gateway = GatewayUpdate(
             auth_type="authheaders",
             auth_headers=auth_headers
         )
-        
+
         assert gateway.auth_value is not None
         decoded = decode_auth(gateway.auth_value)
         assert decoded["X-New-Header"] == "new_value"
@@ -165,14 +170,14 @@ class TestMultiAuthHeaders:
             {"key": "X-Special-!@#", "value": "value-with-特殊字符"},
             {"key": "Content-Type", "value": "application/json; charset=utf-8"}
         ]
-        
+
         gateway = GatewayCreate(
             name="Test Gateway",
             url="http://example.com",
             auth_type="authheaders",
             auth_headers=auth_headers
         )
-        
+
         decoded = decode_auth(gateway.auth_value)
         assert decoded["X-Special-!@#"] == "value-with-特殊字符"
         assert decoded["Content-Type"] == "application/json; charset=utf-8"
@@ -185,14 +190,14 @@ class TestMultiAuthHeaders:
             {"key": "x-api-key", "value": "value2"},
             {"key": "X-Api-Key", "value": "value3"}
         ]
-        
+
         gateway = GatewayCreate(
             name="Test Gateway",
             url="http://example.com",
             auth_type="authheaders",
             auth_headers=auth_headers
         )
-        
+
         decoded = decode_auth(gateway.auth_value)
         # All three variations should be preserved as separate keys
         assert len(decoded) == 3
@@ -202,17 +207,17 @@ class TestMultiAuthHeaders:
         """Test admin endpoint handling of invalid JSON."""
         mock_db = MagicMock()
         mock_user = "test_user"
-        
+
         form_data = FormData([
             ("name", "Test Gateway"),
             ("url", "http://example.com"),
             ("auth_type", "authheaders"),
             ("auth_headers", "{invalid json}")
         ])
-        
+
         mock_request = MagicMock(spec=Request)
         mock_request.form = AsyncMock(return_value=form_data)
-        
+
         with patch("mcpgateway.admin.gateway_service.register_gateway", AsyncMock()):
             response = await admin_add_gateway(mock_request, mock_db, mock_user)
             # Should handle invalid JSON gracefully
@@ -225,14 +230,14 @@ class TestMultiAuthHeaders:
             {"key": f"X-Header-{i}", "value": f"value-{i}"}
             for i in range(100)
         ]
-        
+
         gateway = GatewayCreate(
             name="Test Gateway",
             url="http://example.com",
             auth_type="authheaders",
             auth_headers=auth_headers
         )
-        
+
         decoded = decode_auth(gateway.auth_value)
         assert len(decoded) == 100
         assert decoded["X-Header-50"] == "value-50"
@@ -244,14 +249,14 @@ class TestMultiAuthHeaders:
             {"key": "Authorization", "value": "Bearer token123"},
             {"key": "X-API-Key", "value": "secret"}
         ]
-        
+
         gateway = GatewayCreate(
             name="Test Gateway",
             url="http://example.com",
             auth_type="authheaders",
             auth_headers=auth_headers
         )
-        
+
         decoded = decode_auth(gateway.auth_value)
         assert decoded["Authorization"] == "Bearer token123"
         assert decoded["X-API-Key"] == "secret"

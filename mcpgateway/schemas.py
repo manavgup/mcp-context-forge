@@ -2085,42 +2085,43 @@ class GatewayUpdate(BaseModelWithConfigDict):
                 # New multi-headers format with enhanced validation
                 header_dict = {}
                 duplicate_keys = set()
-                
+
                 for header in auth_headers:
                     if not isinstance(header, dict):
                         continue
-                    
+
                     key = header.get("key")
                     value = header.get("value", "")
-                    
+
                     # Skip headers without keys
                     if not key:
                         continue
-                    
+
                     # Track duplicate keys (last value wins)
                     if key in header_dict:
                         duplicate_keys.add(key)
-                    
+
                     # Validate header key format (basic HTTP header validation)
                     if not all(c.isalnum() or c in '-_' for c in key.replace(' ', '')):
                         raise ValueError(f"Invalid header key format: '{key}'. Header keys should contain only alphanumeric characters, hyphens, and underscores.")
-                    
+
                     # Store header (empty values are allowed)
                     header_dict[key] = value
-                
+
                 # Ensure at least one valid header
                 if not header_dict:
                     raise ValueError("For 'headers' auth, at least one valid header with a key must be provided.")
-                
+
                 # Warn about duplicate keys (optional - could log this instead)
                 if duplicate_keys:
+                    # Standard
                     import logging
                     logging.warning(f"Duplicate header keys detected (last value used): {', '.join(duplicate_keys)}")
-                
+
                 # Check for excessive headers (prevent abuse)
                 if len(header_dict) > 100:
                     raise ValueError("Maximum of 100 headers allowed per gateway.")
-                
+
                 return encode_auth(header_dict)
             else:
                 # Legacy single header format (backward compatibility)
